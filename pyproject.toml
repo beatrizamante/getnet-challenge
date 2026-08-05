@@ -1,0 +1,24 @@
+[project]
+name = "getnet-challenge"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Beatriz Amante", email = "beatrizamante@hotmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "arq>=0.25.0",
+    "chromadb>=1.5.9",
+    "deepeval>=4.1.5",
+    "fastapi>=0.141.1",
+    "langgraph>=1.2.10",
+    "pydantic-ai>=2.24.0",
+    "redis>=8.1.0",
+]
+
+[project.scripts]
+getnet-challenge = "src.main:main"
+
+[tool.uv]
+package = false

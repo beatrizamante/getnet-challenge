@@ -1,0 +1,20 @@
+# Local dev: hot reload + ports exposed
+services:
+  app:
+    command: uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload
+    volumes:
+      - ./src:/app/src
+    ports:
+      - "5000:5000"
+
+  chromadb:
+    ports:
+      - "8000:8000"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  langfuse:
+    ports:
+      - "3000:3000"

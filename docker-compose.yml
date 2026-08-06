@@ -1,0 +1,101 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
+    env_file: .env
+    environment:
+      CHROMA_HOST: chromadb
+      REDIS_HOST: redis
+      LANGFUSE_HOST: http://langfuse:3000
+    networks: [getnet-net]
+    depends_on:
+      chromadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      langfuse:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:5000/docs'')" || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  chromadb:
+    image: chromadb/chroma:latest
+    environment:
+      IS_PERSISTENT: "TRUE"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks: [getnet-net]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/api/v2/heartbeat'')" || exit 1',
+        ]
+      interval: 20s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    networks: [getnet-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    networks: [getnet-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme}
+      SALT: ${LANGFUSE_SALT:-changeme}
+      TELEMETRY_ENABLED: "false"
+    networks: [getnet-net]
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:3000/api/public/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+networks:
+  getnet-net:
+    driver: bridge
+
+volumes:
+  chroma-data:
+  langfuse-db-data:

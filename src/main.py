@@ -11,13 +11,13 @@ logger = CONTAINER.logger()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Initializes modules on app start instead of waiting for a request"""
-    logger.info("Loading model and tokenizer...")
-    logger.info("Model and tokenizer ready.")
+    settings = CONTAINER.settings()
+    logger.info("Settings loaded. env=%s", settings.app.env)
     yield
 
 app = FastAPI(lifespan=lifespan)
 
 if __name__ == "__main__":
-    logger.info("Starting WatchMe AI Backend...")
+    logger.info("Starting Getnet Challenge...")
     server = make_server()
     server.run()

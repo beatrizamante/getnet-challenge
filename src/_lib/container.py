@@ -1,6 +1,7 @@
 
 
 from src.config.logger import setup_logging
+from src.infrastructure.config.settings import get_settings
 
 from dependency_injector import containers, providers
 
@@ -8,6 +9,7 @@ from dependency_injector import containers, providers
 class Container(containers.DeclarativeContainer):
     """Dependency injection container for application services and configuration."""
 
+    settings = providers.Singleton(get_settings)
     logger = providers.Singleton(setup_logging)
 
 class ContainerSingleton:

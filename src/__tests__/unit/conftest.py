@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import chromadb
 import fakeredis.aioredis
 import pytest
@@ -41,7 +42,7 @@ class _AsyncChromaClient:
     async def delete_collection(self, name: str) -> None:
         try:
             self._client.delete_collection(name)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             pass
 
 

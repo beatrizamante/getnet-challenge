@@ -45,6 +45,19 @@ class LangfuseSettings(BaseSettings):
     enabled: bool = Field(default=False)
 
 
+class EmbeddingSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="HF_", env_file=".env", extra="ignore")
+
+    model_name: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
+
+
+class SearchSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="SEARCH_", env_file=".env", extra="ignore")
+
+    api_key: str = Field(default="")
+    max_results: int = Field(default=5)
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
@@ -61,6 +74,8 @@ class Settings(BaseSettings):
     chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    search: SearchSettings = Field(default_factory=SearchSettings)
     app: AppSettings = Field(default_factory=AppSettings)
 
 

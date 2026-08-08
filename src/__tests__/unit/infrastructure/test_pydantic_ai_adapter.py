@@ -1,10 +1,9 @@
+# pylint: disable=redefined-outer-name,protected-access
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from pydantic import BaseModel
-from pydantic_ai.models.test import TestModel
 
 from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
-
 
 
 class _Answer(BaseModel):
@@ -20,9 +19,23 @@ def mock_langfuse():
 
 
 @pytest.fixture
-def adapter(mock_langfuse):
+def mock_chat_model():
+    model = MagicMock()
+    # plain completion: ainvoke returns a message-like object
+    mock_msg = MagicMock()
+    mock_msg.content = "Test response from DeepSeek"
+    model.ainvoke = AsyncMock(return_value=mock_msg)
+    # structured completion: with_structured_output returns a runnable whose ainvoke returns a schema instance
+    structured = MagicMock()
+    structured.ainvoke = AsyncMock(return_value=_Answer(text="ok", confidence=0.9))
+    model.with_structured_output = MagicMock(return_value=structured)
+    return model
+
+
+@pytest.fixture
+def adapter(mock_langfuse, mock_chat_model):
     instance = LLMAdapter.__new__(LLMAdapter)
-    instance._model = TestModel()
+    instance._model = mock_chat_model
     instance._langfuse = mock_langfuse
     return instance
 
@@ -53,6 +66,11 @@ async def test_complete_structured_traces_in_langfuse(adapter, mock_langfuse):
     mock_langfuse.span.assert_called_once()
 
 
+async def test_complete_structured_calls_with_structured_output(adapter, mock_chat_model):
+    await adapter.complete_structured("prompt", _Answer)
+    mock_chat_model.with_structured_output.assert_called_once_with(_Answer)
+
+
 async def test_complete_retries_on_rate_limit(mock_langfuse):
     import httpx
     from src.infrastructure.adapters.llm.llm_adapter import _with_retry
@@ -66,9 +84,9 @@ async def test_complete_retries_on_rate_limit(mock_langfuse):
             response = MagicMock()
             response.status_code = 429
             raise httpx.HTTPStatusError("rate limited", request=MagicMock(), response=response)
-        return MagicMock(output="ok")
+        return MagicMock(content="ok")
 
-    with patch("src.infrastructure.adapters.llm.pydantic_ai_adapter.asyncio.sleep"):
+    with patch("src.infrastructure.adapters.llm.llm_adapter.asyncio.sleep"):
         result = await _with_retry(flaky)
-    assert result.output == "ok"
+    assert result.content == "ok"
     assert calls == 3

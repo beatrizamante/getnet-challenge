@@ -3,10 +3,9 @@ import logging
 from typing import Any, Awaitable, Callable, TypeVar
 
 import httpx
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
-from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
 
 from src.domain.ports.LLM_Port import LLMPort
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
@@ -23,21 +22,23 @@ _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 class LLMAdapter(LLMPort):
-    """LLMPort adapter."""
+    """LLMPort backed by LangChain's ChatOpenAI — same model layer LangGraph uses."""
 
     def __init__(self, settings: LLMSettings, langfuse: LangfuseAdapter) -> None:
-        self._model = OpenAIChatModel(
-            settings.llm_model,
-            provider=OpenAIProvider(base_url=settings.base_url, api_key=settings.llm_api_key),
+        self._model = ChatOpenAI(
+            model=settings.llm_model,
+            openai_api_key=settings.llm_api_key,  # type: ignore[arg-type]
+            base_url=settings.base_url,
+            max_retries=0,  # retries handled by _with_retry below
         )
         self._langfuse = langfuse
 
     async def complete(self, prompt: str, system: str) -> str:
         """Run a free-text completion and trace the call in Langfuse."""
         trace_id = self._langfuse.trace("llm.complete", {"prompt": prompt, "system": system})
-        agent = Agent(self._model, instructions=system, retries=_MAX_RETRIES)
-        result = await _with_retry(agent.run, prompt)
-        output = str(result.output)
+        messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
+        response = await _with_retry(self._model.ainvoke, messages)
+        output = str(response.content)
         self._langfuse.span(trace_id, "llm.complete", input_data={"prompt": prompt}, output={"output": output})
         return output
 
@@ -46,15 +47,15 @@ class LLMAdapter(LLMPort):
         trace_id = self._langfuse.trace(
             "llm.complete_structured", {"prompt": prompt, "schema": schema.__name__}
         )
-        agent: Agent[None, T] = Agent(self._model, output_type=schema, retries=_MAX_RETRIES)
-        result = await _with_retry(agent.run, prompt)
+        structured = self._model.with_structured_output(schema)
+        result: T = await _with_retry(structured.ainvoke, prompt)  # type: ignore[assignment]
         self._langfuse.span(
             trace_id,
             "llm.complete_structured",
             input_data={"prompt": prompt},
-            output={"output": result.output.model_dump()},
+            output={"output": result.model_dump()},
         )
-        return result.output
+        return result
 
 
 _R = TypeVar("_R")

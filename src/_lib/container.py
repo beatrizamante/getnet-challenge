@@ -20,6 +20,7 @@ from src.infrastructure.adapters.queue.arq_adapter import ArqQueueAdapter
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
 from src.infrastructure.adapters.vector_store.chroma_adapter import ChromaAdapter
 from src.infrastructure.config.settings import Settings, get_settings
+from src.infrastructure.adapters.scraper.getnet_scraper import GetnetScraper
 from src.infrastructure.database.user_repository import InMemoryUserRepository
 
 
@@ -96,6 +97,10 @@ def _make_user_repo() -> InMemoryUserRepository:
     return InMemoryUserRepository()
 
 
+def _make_scraper() -> GetnetScraper:
+    return GetnetScraper()
+
+
 def _make_router_agent(llm: LLMAdapter) -> RouterAgent:
     return RouterAgent(llm=llm)
 
@@ -151,15 +156,14 @@ class Container(containers.DeclarativeContainer):
         embedding=embedding_port,
     )
 
-    # --- Application services ---
     ingest_service = providers.Singleton(_make_ingest_service, vector_store=vector_store_port)
     retrieval_service = providers.Singleton(_make_retrieval_service, vector_store=vector_store_port)
     semantic_cache_service = providers.Singleton(
         _make_semantic_cache, cache=cache_port, llm=llm_port
     )
     user_repo = providers.Singleton(_make_user_repo)
+    scraper = providers.Singleton(_make_scraper)
 
-    # --- Agents ---
     router_agent = providers.Singleton(_make_router_agent, llm=llm_port)
     knowledge_agent = providers.Singleton(
         _make_knowledge_agent,

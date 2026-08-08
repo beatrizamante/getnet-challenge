@@ -9,7 +9,8 @@ class LLMSettings(BaseSettings):
 
     provider: str = Field(default="openai")  # openai | anthropic | gemini
     llm_api_key: str = Field(default="")
-    llm_model: str = Field(default="gpt-4o")
+    llm_model: str = Field(default="deepseek-chat")
+    base_url: str = Field(default="https://api.deepseek.com")
 
 class ChromaDBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CHROMA_", env_file=".env", extra="ignore")
@@ -26,6 +27,7 @@ class RedisSettings(BaseSettings):
     password: str = Field(default="")
     db: int = Field(default=0)
     ttl: int = Field(default=3600)
+    cache_similarity_threshold: float = Field(default=0.92)
 
     @property
     def url(self) -> str:

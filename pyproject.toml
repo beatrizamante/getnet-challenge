@@ -15,6 +15,7 @@ dependencies = [
     "fastapi[standard]>=0.141.1",
     "langfuse>=4.14.3",
     "langgraph>=1.2.10",
+    "openai>=2.53.0",
     "pydantic>=2.13.4",
     "pydantic-ai>=2.24.0",
     "redis>=8.1.0",
@@ -23,5 +24,16 @@ dependencies = [
 [project.scripts]
 getnet-challenge = "src.main:main"
 
+[dependency-groups]
+dev = [
+    "fakeredis>=2.37.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["src/__tests__"]

@@ -42,13 +42,17 @@ class LLMAdapter(LLMPort):
         self._langfuse.span(trace_id, "llm.complete", input_data={"prompt": prompt}, output={"output": output})
         return output
 
-    async def complete_structured(self, prompt: str, schema: type[T]) -> T:
+    async def complete_structured(self, prompt: str, schema: type[T], system: str = "") -> T:
         """Run a structured completion whose output is validated against `schema`."""
         trace_id = self._langfuse.trace(
             "llm.complete_structured", {"prompt": prompt, "schema": schema.__name__}
         )
         structured = self._model.with_structured_output(schema)
-        result: T = await _with_retry(structured.ainvoke, prompt)  # type: ignore[assignment]
+        if system:
+            messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
+            result: T = await _with_retry(structured.ainvoke, messages)  # type: ignore[assignment]
+        else:
+            result = await _with_retry(structured.ainvoke, prompt)  # type: ignore[assignment]
         self._langfuse.span(
             trace_id,
             "llm.complete_structured",

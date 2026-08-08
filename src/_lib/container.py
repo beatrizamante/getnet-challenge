@@ -4,6 +4,13 @@ import chromadb
 import redis.asyncio as aioredis
 from dependency_injector import containers, providers
 
+from src.application.agents.customer_support_agent import CustomerSupportAgent
+from src.application.agents.graph import build_graph
+from src.application.agents.knowledge_agent import KnowledgeAgent
+from src.application.agents.router_agent import RouterAgent
+from src.application.caching.semantic_cache_service import SemanticCacheService
+from src.application.rag_pipeline.ingest_service import RagIngestService
+from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.config.logger import setup_logging
 from src.infrastructure.adapters.cache.redis_cache_adapter import RedisCacheAdapter
 from src.infrastructure.adapters.embeddings.huggingface_adapter import HuggingFaceEmbeddingAdapter
@@ -13,6 +20,7 @@ from src.infrastructure.adapters.queue.arq_adapter import ArqQueueAdapter
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
 from src.infrastructure.adapters.vector_store.chroma_adapter import ChromaAdapter
 from src.infrastructure.config.settings import Settings, get_settings
+from src.infrastructure.database.user_repository import InMemoryUserRepository
 
 
 def _make_langfuse(settings: Settings) -> LangfuseAdapter:
@@ -71,6 +79,50 @@ def _make_vector_store(
         collection_name=settings.chroma.collection_name,
     )
 
+
+def _make_ingest_service(vector_store: ChromaAdapter) -> RagIngestService:
+    return RagIngestService(vector_store=vector_store)
+
+
+def _make_retrieval_service(vector_store: ChromaAdapter) -> RagRetrievalService:
+    return RagRetrievalService(vector_store=vector_store)
+
+
+def _make_semantic_cache(cache: RedisCacheAdapter, llm: LLMAdapter) -> SemanticCacheService:
+    return SemanticCacheService(cache=cache, llm=llm)
+
+
+def _make_user_repo() -> InMemoryUserRepository:
+    return InMemoryUserRepository()
+
+
+def _make_router_agent(llm: LLMAdapter) -> RouterAgent:
+    return RouterAgent(llm=llm)
+
+
+def _make_knowledge_agent(
+    llm: LLMAdapter,
+    retrieval: RagRetrievalService,
+    search: TavilySearchAdapter,
+) -> KnowledgeAgent:
+    return KnowledgeAgent(llm=llm, retrieval=retrieval, search=search)
+
+
+def _make_customer_support_agent(
+    llm: LLMAdapter,
+    user_repo: InMemoryUserRepository,
+) -> CustomerSupportAgent:
+    return CustomerSupportAgent(llm=llm, user_repo=user_repo)
+
+
+def _make_agent_graph(
+    router: RouterAgent,
+    knowledge: KnowledgeAgent,
+    customer_support: CustomerSupportAgent,
+) -> Any:
+    return build_graph(router=router, knowledge=knowledge, customer_support=customer_support)
+
+
 class Container(containers.DeclarativeContainer):
     """Single source of truth for adapter construction and dependency wiring."""
 
@@ -97,6 +149,32 @@ class Container(containers.DeclarativeContainer):
         settings=settings,
         chroma_client=_chroma_client,
         embedding=embedding_port,
+    )
+
+    # --- Application services ---
+    ingest_service = providers.Singleton(_make_ingest_service, vector_store=vector_store_port)
+    retrieval_service = providers.Singleton(_make_retrieval_service, vector_store=vector_store_port)
+    semantic_cache_service = providers.Singleton(
+        _make_semantic_cache, cache=cache_port, llm=llm_port
+    )
+    user_repo = providers.Singleton(_make_user_repo)
+
+    # --- Agents ---
+    router_agent = providers.Singleton(_make_router_agent, llm=llm_port)
+    knowledge_agent = providers.Singleton(
+        _make_knowledge_agent,
+        llm=llm_port,
+        retrieval=retrieval_service,
+        search=search_port,
+    )
+    customer_support_agent = providers.Singleton(
+        _make_customer_support_agent, llm=llm_port, user_repo=user_repo
+    )
+    agent_graph = providers.Singleton(
+        _make_agent_graph,
+        router=router_agent,
+        knowledge=knowledge_agent,
+        customer_support=customer_support_agent,
     )
 
 

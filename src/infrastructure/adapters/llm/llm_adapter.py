@@ -33,6 +33,10 @@ class LLMAdapter(LLMPort):
         )
         self._langfuse = langfuse
 
+    def as_runnable(self) -> ChatOpenAI:
+        """Expose the raw model so LangGraph agents can call bind_tools() on it."""
+        return self._model
+
     async def complete(self, prompt: str, system: str) -> str:
         """Run a free-text completion and trace the call in Langfuse."""
         trace_id = self._langfuse.trace("llm.complete", {"prompt": prompt, "system": system})

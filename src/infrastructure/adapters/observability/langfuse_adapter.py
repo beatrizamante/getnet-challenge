@@ -47,6 +47,21 @@ class LangfuseAdapter:
         client: Any = self._client
         client.score(trace_id=trace_id, name=name, value=value)  # pylint: disable=no-member
 
+    def get_callback_handler(self, user_id: str = "", session_id: str = "", trace_name: str = "") -> Any:
+        """Return a LangChain CallbackHandler that automatically traces LLM+tool calls as child spans."""
+        if not self._enabled or self._client is None:
+            return None
+        try:
+            client: Any = self._client
+            return client.get_langchain_handler(  # pylint: disable=no-member
+                user_id=user_id or None,
+                session_id=session_id or None,
+                trace_name=trace_name or None,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Failed to create Langfuse callback handler. error=%s", exc)
+            return None
+
     def flush(self) -> None:
         """Block until all pending events are sent; call on app shutdown."""
         if self._enabled and self._client is not None:

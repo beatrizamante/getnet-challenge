@@ -5,6 +5,7 @@ import redis.asyncio as aioredis
 from dependency_injector import containers, providers
 
 from src.application.agents.customer_support_agent import CustomerSupportAgent
+from src.application.agents.escalation_agent import EscalationAgent
 from src.application.agents.graph import build_graph
 from src.application.agents.knowledge_agent import KnowledgeAgent
 from src.application.agents.router_agent import RouterAgent
@@ -18,10 +19,10 @@ from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.queue.arq_adapter import ArqQueueAdapter
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
+from src.infrastructure.adapters.user_repository.mock_user_repository import MockUserRepository
 from src.infrastructure.adapters.vector_store.chroma_adapter import ChromaAdapter
 from src.infrastructure.config.settings import Settings, get_settings
 from src.infrastructure.adapters.scraper.getnet_scraper import GetnetScraper
-from src.infrastructure.database.user_repository import InMemoryUserRepository
 
 
 def _make_langfuse(settings: Settings) -> LangfuseAdapter:
@@ -81,8 +82,12 @@ def _make_vector_store(
     )
 
 
-def _make_ingest_service(vector_store: ChromaAdapter) -> RagIngestService:
-    return RagIngestService(vector_store=vector_store)
+def _make_ingest_service(settings: Settings, vector_store: ChromaAdapter) -> RagIngestService:
+    return RagIngestService(
+        vector_store=vector_store,
+        chunk_size=settings.ingestion.chunk_size,
+        chunk_overlap=settings.ingestion.chunk_overlap,
+    )
 
 
 def _make_retrieval_service(vector_store: ChromaAdapter) -> RagRetrievalService:
@@ -93,12 +98,18 @@ def _make_semantic_cache(cache: RedisCacheAdapter, llm: LLMAdapter) -> SemanticC
     return SemanticCacheService(cache=cache, llm=llm)
 
 
-def _make_user_repo() -> InMemoryUserRepository:
-    return InMemoryUserRepository()
+def _make_escalation_agent(
+    langfuse: LangfuseAdapter, redis_client: aioredis.Redis
+) -> EscalationAgent:
+    return EscalationAgent(langfuse=langfuse, redis_client=redis_client)
 
 
-def _make_scraper() -> GetnetScraper:
-    return GetnetScraper()
+def _make_user_repo() -> MockUserRepository:
+    return MockUserRepository()
+
+
+def _make_scraper(settings: Settings) -> GetnetScraper:
+    return GetnetScraper(max_concurrent=settings.ingestion.max_concurrent)
 
 
 def _make_router_agent(llm: LLMAdapter) -> RouterAgent:
@@ -109,23 +120,34 @@ def _make_knowledge_agent(
     llm: LLMAdapter,
     retrieval: RagRetrievalService,
     search: TavilySearchAdapter,
+    cache: RedisCacheAdapter,
+    langfuse: LangfuseAdapter,
 ) -> KnowledgeAgent:
-    return KnowledgeAgent(llm=llm, retrieval=retrieval, search=search)
+    return KnowledgeAgent(llm=llm, retrieval=retrieval, search=search, cache=cache, langfuse=langfuse)
 
 
 def _make_customer_support_agent(
     llm: LLMAdapter,
-    user_repo: InMemoryUserRepository,
+    user_repo: MockUserRepository,
+    langfuse: LangfuseAdapter,
 ) -> CustomerSupportAgent:
-    return CustomerSupportAgent(llm=llm, user_repo=user_repo)
+    return CustomerSupportAgent(llm=llm, user_repo=user_repo, langfuse=langfuse)
 
 
 def _make_agent_graph(
     router: RouterAgent,
     knowledge: KnowledgeAgent,
     customer_support: CustomerSupportAgent,
+    escalation: EscalationAgent,
+    langfuse: LangfuseAdapter,
 ) -> Any:
-    return build_graph(router=router, knowledge=knowledge, customer_support=customer_support)
+    return build_graph(
+        router=router,
+        knowledge=knowledge,
+        customer_support=customer_support,
+        escalation=escalation,
+        langfuse=langfuse,
+    )
 
 
 class Container(containers.DeclarativeContainer):
@@ -140,11 +162,11 @@ class Container(containers.DeclarativeContainer):
     search_port = providers.Singleton(_make_search, settings=settings)
     queue_port = providers.Singleton(_make_queue, settings=settings)
 
-    _redis_client = providers.Singleton(_make_redis_client, settings=settings)
+    redis_client = providers.Singleton(_make_redis_client, settings=settings)
     cache_port = providers.Singleton(
         _make_cache,
         settings=settings,
-        redis_client=_redis_client,
+        redis_client=redis_client,
         embedding=embedding_port,
     )
 
@@ -156,13 +178,15 @@ class Container(containers.DeclarativeContainer):
         embedding=embedding_port,
     )
 
-    ingest_service = providers.Singleton(_make_ingest_service, vector_store=vector_store_port)
+    ingest_service = providers.Singleton(
+        _make_ingest_service, settings=settings, vector_store=vector_store_port
+    )
     retrieval_service = providers.Singleton(_make_retrieval_service, vector_store=vector_store_port)
     semantic_cache_service = providers.Singleton(
         _make_semantic_cache, cache=cache_port, llm=llm_port
     )
     user_repo = providers.Singleton(_make_user_repo)
-    scraper = providers.Singleton(_make_scraper)
+    scraper = providers.Singleton(_make_scraper, settings=settings)
 
     router_agent = providers.Singleton(_make_router_agent, llm=llm_port)
     knowledge_agent = providers.Singleton(
@@ -170,15 +194,22 @@ class Container(containers.DeclarativeContainer):
         llm=llm_port,
         retrieval=retrieval_service,
         search=search_port,
+        cache=cache_port,
+        langfuse=langfuse_adapter,
     )
     customer_support_agent = providers.Singleton(
-        _make_customer_support_agent, llm=llm_port, user_repo=user_repo
+        _make_customer_support_agent, llm=llm_port, user_repo=user_repo, langfuse=langfuse_adapter
+    )
+    escalation_agent = providers.Singleton(
+        _make_escalation_agent, langfuse=langfuse_adapter, redis_client=redis_client
     )
     agent_graph = providers.Singleton(
         _make_agent_graph,
         router=router_agent,
         knowledge=knowledge_agent,
         customer_support=customer_support_agent,
+        escalation=escalation_agent,
+        langfuse=langfuse_adapter,
     )
 
 

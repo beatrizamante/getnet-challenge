@@ -7,8 +7,8 @@ class QueuePort(ABC):
     """Contract for any async job queue backend (ARQ, Celery, etc.)."""
 
     @abstractmethod
-    async def enqueue(self, job_name: str, **kwargs: Any) -> None:
-        """Enqueue a job to run as soon as a worker is available."""
+    async def enqueue(self, job_name: str, **kwargs: Any) -> str | None:
+        """Enqueue a job to run as soon as a worker is available; returns the job ID if available."""
         ...
 
     @abstractmethod

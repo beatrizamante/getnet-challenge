@@ -1,60 +1,131 @@
+import json
 import logging
+from typing import Any
 
-from src.domain.shared.state import AgentOutput, AgentState
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool as lc_tool
+from langgraph.prebuilt import create_react_agent
+
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
+from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
+from src.domain.shared.state import AgentState
+from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
-    "You are a knowledgeable Getnet assistant. "
-    "Use the provided context to answer questions about Getnet products and services accurately and concisely. "
-    "If the context does not contain a clear answer, say so and advise the user to contact support."
+    "You are a Getnet product specialist. "
+    "You have two tools available:\n"
+    "  - retrieve_from_kb: search Getnet's knowledge base for product/service info.\n"
+    "  - web_search: search the web for general questions not in the knowledge base.\n"
+    "Always try retrieve_from_kb first. Only use web_search if the knowledge base "
+    "returns no useful information. "
+    "Always cite sources using the [Source: ...] labels. "
+    "If no source has the answer, say so honestly — never invent facts about Getnet."
 )
 
+_KB_CACHE_TTL = 1800  # 30 min
+
+
 class KnowledgeAgent:
-    """RAG-powered agent that combines vector store retrieval with optional web search."""
+    """LangGraph ReAct agent — the LLM decides which tool to call and when to stop."""
 
     def __init__(
         self,
         llm: LLMPort,
         retrieval: RagRetrievalService,
         search: SearchPort,
+        cache: CachePort,
+        langfuse: LangfuseAdapter | None = None,
+        _graph: Any = None,
     ) -> None:
         self._llm = llm
-        self._retrieval = retrieval
-        self._search = search
+        self._langfuse = langfuse
+        tools = [
+            _make_retrieve_tool(retrieval, cache),
+            _make_web_search_tool(search),
+        ]
+        self._graph = _graph or create_react_agent(
+            llm.as_runnable(),
+            tools=tools,
+            state_modifier=lambda state: [SystemMessage(content=_SYSTEM_PROMPT)] + state,
+        )
 
     async def run(self, state: AgentState) -> dict:
         user_message = state["messages"][-1] if state.get("messages") else ""
+        user_id = str(state.get("user_id", ""))
+        session_id = str(state.get("session_id", ""))
 
-        chunks = await self._retrieval.retrieve_chunks(user_message)
-        search_context = await self._web_search(user_message)
+        callbacks = []
+        if self._langfuse:
+            handler = self._langfuse.get_callback_handler(
+                user_id=user_id, session_id=session_id, trace_name="knowledge_agent"
+            )
+            if handler:
+                callbacks.append(handler)
 
-        rag_context = (
-            "\n\n---\n\n".join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
-            if chunks
-            else ""
+        config: RunnableConfig = {"callbacks": callbacks} if callbacks else {}
+        result = await self._graph.ainvoke(
+            {"messages": [HumanMessage(content=user_message)]}, config=config
         )
-        context = "\n\n".join(filter(None, [rag_context, search_context]))
-        prompt = f"Context:\n{context}\n\nQuestion: {user_message}" if context else user_message
 
-        output = await self._llm.complete_structured(prompt, AgentOutput, system=_SYSTEM_PROMPT)
-        response = {
-            "answer": output.answer,
-            "source_agent": "knowledge",
-            "sources": [c.source for c in chunks],
+        final: AIMessage = result["messages"][-1]
+        answer = final.content if isinstance(final.content, str) else str(final.content)
+        sources = _extract_sources(result["messages"])
+
+        return {
+            "context": "",
+            "response": {"answer": answer, "source_agent": "knowledge", "sources": sources},
         }
-        return {"context": context, "response": response}
 
-    async def _web_search(self, query: str) -> str:
-        try:
-            results = await self._search.search(query)
-            if not results:
-                return ""
-            parts = [f"[{r.title}]({r.url})\n{r.snippet}" for r in results[:3]]
-            return "\n\n".join(parts)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("Web search failed, skipping. error=%s", exc)
+
+def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
+    @lc_tool
+    async def retrieve_from_kb(query: str) -> str:
+        """Search Getnet's knowledge base for product and service information."""
+        cached = await cache.get(query)
+        if cached:
+            logger.debug("KB retrieval cache hit.")
+            return json.loads(cached)["context"]
+
+        chunks = await retrieval.retrieve_chunks(query)
+        if not chunks:
             return ""
+
+        context = "\n\n---\n\n".join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
+        sources = list(dict.fromkeys(c.source for c in chunks))
+        await cache.set(query, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
+        return context
+
+    return retrieve_from_kb
+
+
+def _make_web_search_tool(search: SearchPort):
+    @lc_tool
+    async def web_search(query: str) -> str:
+        """Search the web for questions not covered by the Getnet knowledge base."""
+        try:
+            results = await search.search(query)
+            if not results:
+                return "No results found."
+            return "\n\n".join(f"[{r.title}]({r.url})\n{r.snippet}" for r in results[:3])
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Web search failed. error=%s", exc)
+            return ""
+
+    return web_search
+
+
+def _extract_sources(messages: list) -> list[str]:
+    """Parse [Source: url] labels out of tool response messages."""
+    sources: list[str] = []
+    for msg in messages:
+        content = msg.content if hasattr(msg, "content") else ""
+        if isinstance(content, str):
+            for line in content.splitlines():
+                if line.startswith("[Source: ") and line.endswith("]"):
+                    sources.append(line[9:-1])
+    return list(dict.fromkeys(sources))

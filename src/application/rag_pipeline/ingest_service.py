@@ -1,5 +1,5 @@
+import hashlib
 import logging
-import uuid
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -45,7 +45,13 @@ class RagIngestService:
     def _split(self, text: str, source: str, metadata: dict[str, str]) -> list[Chunk]:
         parts = self._splitter.split_text(text)
         return [
-            Chunk(id=str(uuid.uuid4()), content=part, source=source, metadata=metadata)
-            for part in parts
+            Chunk(
+                # Deterministic ID → upsert is naturally idempotent across re-ingestions
+                id=hashlib.sha256(f"{source}:{i}".encode()).hexdigest()[:32],
+                content=part,
+                source=source,
+                metadata={**metadata, "chunk_index": str(i)},
+            )
+            for i, part in enumerate(parts)
             if part.strip()
         ]

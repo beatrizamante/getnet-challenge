@@ -29,15 +29,17 @@ class ArqQueueAdapter(QueuePort):
             self._pool = await arq.create_pool(self._arq_settings)
         return self._pool
 
-    async def enqueue(self, job_name: str, **kwargs: Any) -> None:
+    async def enqueue(self, job_name: str, **kwargs: Any) -> str | None:
         """Enqueue a job; logs a warning and continues if Redis is unavailable."""
         try:
             pool = await self._get_pool()
-            await pool.enqueue_job(job_name, **kwargs)
-            logger.debug("Job enqueued. job=%s", job_name)
+            job = await pool.enqueue_job(job_name, **kwargs)
+            logger.debug("Job enqueued. job=%s id=%s", job_name, job.job_id if job else None)
+            return job.job_id if job else None
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("ARQ enqueue skipped (Redis unavailable). job=%s error=%s", job_name, exc)
             self._pool = None  # reset so the next call retries the connection
+            return None
 
     async def enqueue_at(self, job_name: str, run_at: datetime, **kwargs: Any) -> None:
         """Enqueue a job deferred until `run_at`."""

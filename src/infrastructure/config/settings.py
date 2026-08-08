@@ -58,6 +58,15 @@ class SearchSettings(BaseSettings):
     max_results: int = Field(default=5)
 
 
+class IngestionSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_", env_file=".env", extra="ignore")
+
+    chunk_size: int = Field(default=512)
+    chunk_overlap: int = Field(default=64)
+    request_delay: float = Field(default=1.5)  # seconds between page ingestions in the job
+    max_concurrent: int = Field(default=3)     # max parallel HTTP requests in scraper
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
@@ -77,6 +86,7 @@ class Settings(BaseSettings):
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
     app: AppSettings = Field(default_factory=AppSettings)
+    ingestion: IngestionSettings = Field(default_factory=IngestionSettings)
 
 
 @lru_cache(maxsize=1)

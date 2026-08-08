@@ -15,3 +15,4 @@ class AgentState(TypedDict):
     route: NotRequired[str | None]
     context: NotRequired[str]
     response: NotRequired[dict | None]
+    session_id: NotRequired[str]  # propagated for Langfuse trace correlation

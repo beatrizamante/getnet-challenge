@@ -1,8 +1,10 @@
 import os
 
 import arq.connections
+from arq import cron
 
 from src._lib.container import get_container
+from src.application.jobs.eval_job import run_eval_suite
 from src.application.jobs.ingestion_job import run_ingestion_pipeline
 
 
@@ -25,6 +27,7 @@ class WorkerSettings:
         password=os.getenv("REDIS_PASSWORD") or None,
         database=int(os.getenv("REDIS_DB", "0")),
     )
-    functions = [run_ingestion_pipeline]
+    functions = [run_ingestion_pipeline, run_eval_suite]
+    cron_jobs = [cron(run_eval_suite, hour=2, minute=0)]  # nightly at 02:00 UTC
     on_startup = _on_startup
     on_shutdown = _on_shutdown

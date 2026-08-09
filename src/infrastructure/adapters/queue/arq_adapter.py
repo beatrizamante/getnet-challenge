@@ -21,7 +21,6 @@ class ArqQueueAdapter(QueuePort):
             password=settings.password or None,
             database=settings.db,
         )
-        # Pool is created lazily on first enqueue call to avoid blocking __init__
         self._pool: arq.ArqRedis | None = None
 
     async def _get_pool(self) -> arq.ArqRedis:

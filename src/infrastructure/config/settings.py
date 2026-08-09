@@ -63,9 +63,25 @@ class IngestionSettings(BaseSettings):
 
     chunk_size: int = Field(default=512)
     chunk_overlap: int = Field(default=64)
-    request_delay: float = Field(default=1.5)  # seconds between page ingestions in the job
-    max_concurrent: int = Field(default=3)     # max parallel HTTP requests in scraper
+    request_delay: float = Field(default=1.5)
+    max_concurrent: int = Field(default=3)
 
+
+class GuardrailSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="GUARDRAIL_", env_file=".env", extra="ignore")
+
+    model: str = Field(default="deepseek-chat")
+    faithfulness_threshold: float = Field(default=0.7)
+    enabled: bool = Field(default=True)
+
+
+class RerankerSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="RERANKER_", env_file=".env", extra="ignore")
+
+    model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2")
+    top_n: int = Field(default=4)
+    factor: int = Field(default=4)
+    enabled: bool = Field(default=False)
 
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
@@ -87,6 +103,8 @@ class Settings(BaseSettings):
     search: SearchSettings = Field(default_factory=SearchSettings)
     app: AppSettings = Field(default_factory=AppSettings)
     ingestion: IngestionSettings = Field(default_factory=IngestionSettings)
+    guardrail: GuardrailSettings = Field(default_factory=GuardrailSettings)
+    reranker: RerankerSettings = Field(default_factory=RerankerSettings)
 
 
 @lru_cache(maxsize=1)

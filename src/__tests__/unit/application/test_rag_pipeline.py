@@ -6,6 +6,7 @@ import pytest
 from src.application.rag_pipeline.ingest_service import RagIngestService
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.domain.entities.Chunk import Chunk
+from src.domain.ports.Reranker_Port import RerankerPort
 from src.domain.ports.Vector_Store_Port import VectorStorePort
 
 
@@ -69,3 +70,31 @@ class TestRagRetrievalService:
 
         assert result == expected
         vector_store.similarity_search.assert_awaited_once_with("q", 2)
+
+    async def test_retrieve_chunks_uses_reranker_when_provided(self, vector_store):
+        candidates = [Chunk(id=str(i), content=f"chunk {i}", source="s") for i in range(8)]
+        reranked = candidates[:2]
+        vector_store.similarity_search.return_value = candidates
+
+        reranker = AsyncMock(spec=RerankerPort)
+        reranker.rerank.return_value = reranked
+
+        service = RagRetrievalService(
+            vector_store=vector_store, reranker=reranker, top_n=2, rerank_factor=4
+        )
+        result = await service.retrieve_chunks("q")
+
+        # should fetch top_n * factor = 8 candidates, then rerank to 2
+        vector_store.similarity_search.assert_awaited_once_with("q", 8)
+        reranker.rerank.assert_awaited_once_with("q", candidates, 2)
+        assert result == reranked
+
+    async def test_retrieve_chunks_bypasses_reranker_when_none(self, vector_store):
+        chunks = [Chunk(id="1", content="x", source="s")]
+        vector_store.similarity_search.return_value = chunks
+
+        service = RagRetrievalService(vector_store=vector_store, reranker=None)
+        result = await service.retrieve_chunks("q", k=3)
+
+        vector_store.similarity_search.assert_awaited_once_with("q", 3)
+        assert result == chunks

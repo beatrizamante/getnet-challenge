@@ -8,7 +8,7 @@ from src.application.agents.escalation_agent import EscalationAgent
 from src.application.agents.knowledge_agent import KnowledgeAgent
 from src.application.agents.router_agent import RouterAgent
 from src.domain.entities.Agent_Response import AgentResponseModel
-from src.domain.shared.state import AgentState
+from src.domain.shared.State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.observability.tracing import traced_node
 
@@ -83,7 +83,6 @@ def build_graph(
             "off_topic": "off_topic",
         },
     )
-    # All agent nodes funnel through the formatter before the graph exits
     graph.add_edge("knowledge", "formatter")
     graph.add_edge("customer_support", "formatter")
     graph.add_edge("escalate", "formatter")

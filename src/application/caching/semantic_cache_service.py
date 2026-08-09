@@ -24,3 +24,11 @@ class SemanticCacheService:
         answer = await self._llm.complete(prompt, system)
         await self._cache.set(prompt, answer, ttl or self._default_ttl)
         return answer
+
+    async def get(self, key: str) -> str | None:
+        """Semantic similarity lookup — returns cached value or None."""
+        return await self._cache.get(key)
+
+    async def set(self, key: str, value: str, ttl: int | None = None) -> None:
+        """Store value under a semantically-indexed key."""
+        await self._cache.set(key, value, ttl or self._default_ttl)

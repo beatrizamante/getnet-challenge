@@ -21,11 +21,9 @@ def mock_langfuse():
 @pytest.fixture
 def mock_chat_model():
     model = MagicMock()
-    # plain completion: ainvoke returns a message-like object
     mock_msg = MagicMock()
     mock_msg.content = "Test response from DeepSeek"
     model.ainvoke = AsyncMock(return_value=mock_msg)
-    # structured completion: with_structured_output returns a runnable whose ainvoke returns a schema instance
     structured = MagicMock()
     structured.ainvoke = AsyncMock(return_value=_Answer(text="ok", confidence=0.9))
     model.with_structured_output = MagicMock(return_value=structured)

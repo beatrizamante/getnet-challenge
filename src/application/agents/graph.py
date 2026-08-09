@@ -18,7 +18,7 @@ _OFF_TOPIC_ANSWER = (
 )
 
 
-async def _off_topic_node(**_: object) -> dict:  # type: ignore[misc]
+async def _off_topic_node(_: AgentState) -> dict:
     return {"response": {"answer": _OFF_TOPIC_ANSWER, "source_agent": "off_topic", "sources": []}}
 
 

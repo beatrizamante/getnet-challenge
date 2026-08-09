@@ -1,6 +1,6 @@
 import logging
 
-from src.domain.shared.state import AgentState
+from src.domain.shared.State import AgentState
 from src.domain.entities.Route_Decision import RouteDecisionModel
 from src.domain.ports.LLM_Port import LLMPort
 
@@ -64,13 +64,15 @@ class RouterAgent:
 
     async def run(self, state: AgentState) -> dict:
         user_message = state["messages"][-1] if state.get("messages") else ""
-        decision: RouteDecisionModel = await self._llm.complete_structured(
-            prompt=user_message,
-            schema=RouteDecisionModel,
-            system=_SYSTEM_PROMPT,
-        )
-        logger.info(
-            "Router → route=%s intent=%s reasoning=%s",
-            decision.target_agent, decision.intent, decision.reasoning,
-        )
-        return {"route": decision.target_agent}
+        try:
+            decision: RouteDecisionModel = await self._llm.complete_structured(
+                prompt=user_message,
+                schema=RouteDecisionModel,
+                system=_SYSTEM_PROMPT,
+            )
+            route = decision.target_agent
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Router failed to parse decision, defaulting to escalate. error=%s", exc)
+            route = "escalate"
+        logger.info("Router → route=%s", route)
+        return {"route": route}

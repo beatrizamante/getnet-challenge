@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
 from langgraph.prebuilt import create_react_agent
@@ -11,7 +11,7 @@ from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
-from src.domain.shared.state import AgentState
+from src.domain.shared.State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class KnowledgeAgent:
         self._graph = _graph or create_react_agent(
             llm.as_runnable(),
             tools=tools,
-            state_modifier=lambda state: [SystemMessage(content=_SYSTEM_PROMPT)] + state,
+            prompt=_SYSTEM_PROMPT,
         )
 
     async def run(self, state: AgentState) -> dict:
@@ -86,10 +86,16 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
     @lc_tool
     async def retrieve_from_kb(query: str) -> str:
         """Search Getnet's knowledge base for product and service information."""
-        cached = await cache.get(query)
+        cache_key = f"kb:{query}"
+        cached = await cache.get(cache_key)
         if cached:
-            logger.debug("KB retrieval cache hit.")
-            return json.loads(cached)["context"]
+            try:
+                data = json.loads(cached)
+                if "context" in data:
+                    logger.debug("KB retrieval cache hit.")
+                    return data["context"]
+            except (json.JSONDecodeError, KeyError):
+                pass
 
         chunks = await retrieval.retrieve_chunks(query)
         if not chunks:
@@ -97,7 +103,7 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
 
         context = "\n\n---\n\n".join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
         sources = list(dict.fromkeys(c.source for c in chunks))
-        await cache.set(query, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
+        await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
         return context
 
     return retrieve_from_kb
@@ -111,12 +117,21 @@ def _make_web_search_tool(search: SearchPort):
             results = await search.search(query)
             if not results:
                 return "No results found."
-            return "\n\n".join(f"[{r.title}]({r.url})\n{r.snippet}" for r in results[:3])
+            return "\n\n".join(
+                f"[{r.title}]({r.url})\n{_sanitize_snippet(r.snippet)}" for r in results[:3]
+            )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Web search failed. error=%s", exc)
             return ""
 
     return web_search
+
+
+def _sanitize_snippet(text: str, max_chars: int = 400) -> str:
+    """Strip HTML tags and cap length — reduces indirect prompt injection surface."""
+    import re
+    clean = re.sub(r"<[^>]+>", "", text)
+    return re.sub(r"\s+", " ", clean).strip()[:max_chars]
 
 
 def _extract_sources(messages: list) -> list[str]:

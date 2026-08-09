@@ -39,7 +39,7 @@ async def ready(
         ok = False
 
     try:
-        chroma: ChromaAdapter = container.vector_store_port()  # type: ignore[assignment]
+        chroma: ChromaAdapter = await container.vector_store_port.async_()  # type: ignore[assignment]
         await asyncio.wait_for(chroma.ping(), timeout=2.0)
         checks["chromadb"] = "ok"
     except Exception as exc:  # pylint: disable=broad-except

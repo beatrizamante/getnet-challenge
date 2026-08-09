@@ -26,7 +26,7 @@ async def run_ingestion_pipeline(ctx: dict[str, Any], *, force: bool = False) ->
     """
     container = ctx["container"]
     scraper: GetnetScraper = container.scraper()
-    ingest_service: RagIngestService = container.ingest_service()
+    ingest_service: RagIngestService = await container.ingest_service.async_()
     langfuse: LangfuseAdapter = container.langfuse_adapter()
     redis_client: aioredis.Redis = container.redis_client()
     delay: float = container.settings().ingestion.request_delay

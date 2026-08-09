@@ -9,14 +9,13 @@ services:
     environment:
       CHROMA_HOST: chromadb
       REDIS_HOST: redis
-      LANGFUSE_HOST: http://langfuse:3000
+    volumes:
+      - hf-cache:/app/hf_cache
     networks: [getnet-net]
     depends_on:
       chromadb:
-        condition: service_healthy
+        condition: service_started
       redis:
-        condition: service_healthy
-      langfuse:
         condition: service_healthy
     healthcheck:
       test:
@@ -34,64 +33,18 @@ services:
     environment:
       IS_PERSISTENT: "TRUE"
     volumes:
-      - chroma-data:/chroma/chroma
+      - chroma-data:/data
     networks: [getnet-net]
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/api/v2/heartbeat'')" || exit 1',
-        ]
-      interval: 20s
-      timeout: 10s
-      start_period: 15s
-      retries: 3
 
   redis:
     image: redis:7-alpine
+    volumes:
+      - redis-data:/data
     networks: [getnet-net]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
-  langfuse-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse
-      POSTGRES_DB: langfuse
-    volumes:
-      - langfuse-db-data:/var/lib/postgresql/data
-    networks: [getnet-net]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:2
-    environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme}
-      SALT: ${LANGFUSE_SALT:-changeme}
-      TELEMETRY_ENABLED: "false"
-    networks: [getnet-net]
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -qO- http://localhost:3000/api/public/health || exit 1",
-        ]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
       retries: 5
 
   arq-worker:
@@ -102,10 +55,35 @@ services:
     env_file: .env
     environment:
       REDIS_HOST: redis
+      CHROMA_HOST: chromadb
+    volumes:
+      - hf-cache:/app/hf_cache
     networks: [getnet-net]
     depends_on:
       redis:
         condition: service_healthy
+      chromadb:
+        condition: service_started
+
+  # One-shot seed container — run with: docker compose run --rm ingest
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
+    command: ["python", "scripts/ingest.py"]
+    env_file: .env
+    environment:
+      CHROMA_HOST: chromadb
+      REDIS_HOST: redis
+    volumes:
+      - hf-cache:/app/hf_cache
+    networks: [getnet-net]
+    depends_on:
+      chromadb:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    profiles: ["tools"]
 
 networks:
   getnet-net:
@@ -113,4 +91,5 @@ networks:
 
 volumes:
   chroma-data:
-  langfuse-db-data:
+  redis-data:
+  hf-cache:

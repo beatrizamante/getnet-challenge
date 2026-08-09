@@ -37,14 +37,14 @@ _EVAL_REDIS_KEY = "eval:latest"
 async def run_eval_suite(ctx: dict[str, Any]) -> dict[str, Any]:
     """ARQ job: run the full DeepEval suite against the golden dataset and store results in Redis."""
     container = ctx["container"]
-    graph = container.agent_graph()
+    graph = await container.agent_graph.async_()
     redis_client = container.redis_client()
     input_guard: InputGuardrail = container.input_guardrail()
     langfuse = container.langfuse_adapter()
 
     settings = container.settings()
     judge = DeepSeekJudgeModel(
-        api_key=settings.llm.llm_api_key,
+        api_key=settings.llm.api_key,
         base_url=settings.llm.base_url,
         model_name=settings.guardrail.model,
     )

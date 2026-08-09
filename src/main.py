@@ -24,6 +24,11 @@ async def lifespan(_: FastAPI):
     _settings = CONTAINER.settings()
     logger.info("Starting Getnet Challenge. env=%s", _settings.app.env)
     await CONTAINER.init_resources()  # type: ignore[misc]
+    await CONTAINER.vector_store_port.async_()
+    await CONTAINER.agent_graph.async_()
+    CONTAINER.input_guardrail()
+    CONTAINER.output_guardrail()
+    CONTAINER.semantic_cache_service()
     yield
     await CONTAINER.shutdown_resources()  # type: ignore[misc]
     logger.info("Shutdown complete.")
@@ -71,6 +76,11 @@ async def _unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"error": "INTERNAL_ERROR", "detail": "An unexpected error occurred."})
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Entrypoint for `uv run getnet-challenge` and `python -m src.main` (run from project root)."""
     server = make_server()
     server.run()
+
+
+if __name__ == "__main__":
+    main()

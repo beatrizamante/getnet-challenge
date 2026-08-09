@@ -31,3 +31,4 @@ class WorkerSettings:
     cron_jobs = [cron(run_eval_suite, hour=2, minute=0)]  # nightly at 02:00 UTC
     on_startup = _on_startup
     on_shutdown = _on_shutdown
+    job_timeout = 1200  # 20 min — eval suite makes many sequential LLM calls

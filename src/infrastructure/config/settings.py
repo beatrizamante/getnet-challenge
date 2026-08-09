@@ -8,7 +8,7 @@ class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
 
     provider: str = Field(default="openai")  # openai | anthropic | gemini
-    llm_api_key: str = Field(default="")
+    api_key: str = Field(default="")
     llm_model: str = Field(default="deepseek-chat")
     base_url: str = Field(default="https://api.deepseek.com")
 
@@ -70,7 +70,7 @@ class IngestionSettings(BaseSettings):
 class GuardrailSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="GUARDRAIL_", env_file=".env", extra="ignore")
 
-    model: str = Field(default="deepseek-chat")
+    model: str = Field(default="deepseek-v4-flash")
     faithfulness_threshold: float = Field(default=0.7)
     enabled: bool = Field(default=True)
 

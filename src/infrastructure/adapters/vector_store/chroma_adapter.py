@@ -1,8 +1,12 @@
+import logging
+
 from chromadb.api.async_api import AsyncClientAPI
 
 from src.domain.entities.Chunk import Chunk
 from src.domain.ports.Embedding_Port import EmbeddingPort
 from src.domain.ports.Vector_Store_Port import VectorStorePort
+
+logger = logging.getLogger(__name__)
 
 
 class ChromaAdapter(VectorStorePort):
@@ -10,7 +14,7 @@ class ChromaAdapter(VectorStorePort):
 
     def __init__(
         self,
-        client: AsyncClientAPI,  # chromadb.AsyncHttpClient in production; async wrapper in tests
+        client: AsyncClientAPI | None,  # None when ChromaDB is unavailable at startup
         embedding_port: EmbeddingPort,
         collection_name: str = "getnet_kb",
     ) -> None:
@@ -19,15 +23,21 @@ class ChromaAdapter(VectorStorePort):
         self._collection_name = collection_name
         self._collection = None
 
+    def _check_available(self) -> None:
+        if self._client is None:
+            raise RuntimeError("ChromaDB is not available. Start the ChromaDB service and restart.")
+
     async def ping(self) -> bool:
         """Return True if the ChromaDB server is reachable."""
-        await self._client.heartbeat()
+        self._check_available()
+        await self._client.heartbeat()  # type: ignore[union-attr]
         return True
 
     async def _get_collection(self):
         """Lazily resolve the ChromaDB collection, creating it if it does not exist yet."""
+        self._check_available()
         if self._collection is None:
-            self._collection = await self._client.get_or_create_collection(
+            self._collection = await self._client.get_or_create_collection(  # type: ignore[union-attr]
                 name=self._collection_name,
                 metadata={"hnsw:space": "cosine"},
             )
@@ -35,6 +45,7 @@ class ChromaAdapter(VectorStorePort):
 
     async def upsert(self, chunks: list[Chunk]) -> None:
         """Embed all chunks in a single batch call and upsert them; duplicate IDs overwrite existing entries."""
+        self._check_available()
         if not chunks:
             return
         collection = await self._get_collection()

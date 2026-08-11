@@ -1,8 +1,12 @@
 # pylint: disable=redefined-outer-name
+from langchain_core.messages import AIMessage, ToolMessage
 from unittest.mock import AsyncMock
+import json
+from datetime import datetime, timezone
+
 
 from src.application.agents.router_agent import RouterAgent
-from src.application.agents.knowledge_agent import KnowledgeAgent
+from src.application.agents.knowledge_agent import KnowledgeAgent, _make_retrieve_tool
 from src.application.agents.customer_support_agent import (
     CustomerSupportAgent,
     _make_get_profile_tool,
@@ -10,12 +14,14 @@ from src.application.agents.customer_support_agent import (
     _make_get_transactions_tool,
 )
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
+from src.domain.entities.User_Profile import UserProfile
 from src.domain.entities.Chunk import Chunk
 from src.domain.entities.Route_Decision import RouteDecisionModel
-from src.domain.entities.User_Profile import UserProfile
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
+from src.domain.entities.Transaction import Transaction
 from src.domain.ports.Search_Port import SearchPort
+from src.domain.shared.Application_Errors import UserNotFoundError
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 
 
@@ -142,10 +148,9 @@ class TestRouterAgent:
 
 
 class TestKnowledgeAgent:
-    """Tests inject a mock graph via _graph= to bypass create_react_agent entirely."""
+    """Tests inject a mock graph via _graph= to bypass create_agent entirely."""
 
     def _make_mock_graph(self, answer: str = "answer", sources: list[str] | None = None):
-        from langchain_core.messages import AIMessage, ToolMessage
         mock_graph = AsyncMock()
         messages = [AIMessage(content=answer)]
         if sources:
@@ -159,7 +164,7 @@ class TestKnowledgeAgent:
         llm = AsyncMock(spec=LLMPort)
         retrieval = AsyncMock(spec=RagRetrievalService)
         search = AsyncMock(spec=SearchPort)
-        cache = AsyncMock(spec=CachePort, **{"get.return_value": None})
+        cache = AsyncMock(spec=CachePort, **{"get.return_value": None}) # type: ignore
         return KnowledgeAgent(llm=llm, retrieval=retrieval, search=search, cache=cache, _graph=graph)
 
     async def test_run_returns_answer_from_graph(self):
@@ -188,9 +193,6 @@ class TestKnowledgeAgent:
 
     async def test_retrieve_tool_caches_result(self):
         """Tests the retrieve_from_kb tool function independently."""
-        import json
-        from src.application.agents.knowledge_agent import _make_retrieve_tool
-
         retrieval = AsyncMock(spec=RagRetrievalService)
         retrieval.retrieve_chunks.return_value = [
             Chunk(id="1", content="info", source="getnet.com.br")
@@ -198,7 +200,7 @@ class TestKnowledgeAgent:
         cache = AsyncMock(spec=CachePort)
         cache.get.return_value = None
 
-        tool = _make_retrieve_tool(retrieval, cache)
+        tool = _make_retrieve_tool(retrieval, cache, [])
         result = await tool.ainvoke({"query": "payment methods"})
 
         assert "info" in result
@@ -207,14 +209,11 @@ class TestKnowledgeAgent:
         assert "getnet.com.br" in stored["sources"]
 
     async def test_retrieve_tool_returns_cached_without_chromadb(self):
-        import json
-        from src.application.agents.knowledge_agent import _make_retrieve_tool
-
         retrieval = AsyncMock(spec=RagRetrievalService)
         cache = AsyncMock(spec=CachePort)
         cache.get.return_value = json.dumps({"context": "cached ctx", "sources": []})
 
-        tool = _make_retrieve_tool(retrieval, cache)
+        tool = _make_retrieve_tool(retrieval, cache, [])
         result = await tool.ainvoke({"query": "q"})
 
         assert result == "cached ctx"
@@ -223,7 +222,6 @@ class TestKnowledgeAgent:
 
 class TestCustomerSupportAgent:
     def _make_mock_graph(self, answer: str = "answer"):
-        from langchain_core.messages import AIMessage
         mock_graph = AsyncMock()
         mock_graph.ainvoke.return_value = {"messages": [AIMessage(content=answer)]}
         return mock_graph
@@ -251,12 +249,7 @@ class TestCustomerSupportAgent:
         system_content = messages_sent[0].content
         assert "cliente1988" in system_content
 
-    # --- Tool tests ---
-
     async def test_get_profile_tool_returns_formatted_profile(self):
-        from datetime import datetime, timezone
-        from src.domain.entities.User_Profile import UserProfile
-
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_profile.return_value = UserProfile(
             plan="Get Smart", machine_model="Smart 2",
@@ -270,7 +263,6 @@ class TestCustomerSupportAgent:
         assert "active" in result
 
     async def test_get_profile_tool_handles_unknown_user(self):
-        from src.domain.shared.Application_Errors import UserNotFoundError
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_profile.side_effect = UserNotFoundError("ghost")
         tool = _make_get_profile_tool(user_repo)
@@ -279,9 +271,6 @@ class TestCustomerSupportAgent:
         assert "No account found" in result
 
     async def test_get_transactions_tool_formats_list(self):
-        from datetime import datetime, timezone
-        from src.domain.entities.Transaction import Transaction
-
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_transactions.return_value = [
             Transaction(
@@ -306,9 +295,6 @@ class TestCustomerSupportAgent:
         assert "No transactions" in result
 
     async def test_get_settlement_tool_returns_date(self):
-        from datetime import datetime, timezone
-        from src.domain.entities.Transaction import Transaction
-
         tx = Transaction(
             id="TX-001", amount=50000, status="settled",
             created_at=datetime(2026, 8, 6, tzinfo=timezone.utc),

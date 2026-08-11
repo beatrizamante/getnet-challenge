@@ -46,7 +46,6 @@ class RagIngestService:
         parts = self._splitter.split_text(text)
         return [
             Chunk(
-                # Deterministic ID → upsert is naturally idempotent across re-ingestions
                 id=hashlib.sha256(f"{source}:{i}".encode()).hexdigest()[:32],
                 content=part,
                 source=source,

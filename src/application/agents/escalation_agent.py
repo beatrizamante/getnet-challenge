@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 
-from src.domain.shared.State import AgentState
+from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)

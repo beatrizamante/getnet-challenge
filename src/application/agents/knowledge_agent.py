@@ -5,13 +5,13 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
-from src.domain.shared.State import AgentState
+from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
@@ -44,20 +44,26 @@ class KnowledgeAgent:
     ) -> None:
         self._llm = llm
         self._langfuse = langfuse
-        tools = [
-            _make_retrieve_tool(retrieval, cache),
-            _make_web_search_tool(search),
-        ]
-        self._graph = _graph or create_react_agent(
-            llm.as_runnable(),
-            tools=tools,
-            prompt=_SYSTEM_PROMPT,
-        )
+        self._retrieval = retrieval
+        self._search = search
+        self._cache = cache
+        self._graph_override = _graph
 
     async def run(self, state: AgentState) -> dict:
         user_message = state["messages"][-1] if state.get("messages") else ""
         user_id = str(state.get("user_id", ""))
         session_id = str(state.get("session_id", ""))
+
+        retrieved_context: list[str] = []
+        tools = [
+            _make_retrieve_tool(self._retrieval, self._cache, retrieved_context),
+            _make_web_search_tool(self._search),
+        ]
+        graph = self._graph_override or create_agent(
+            self._llm.as_runnable(),
+            tools=tools,
+            system_prompt=_SYSTEM_PROMPT,
+        )
 
         callbacks = []
         if self._langfuse:
@@ -68,21 +74,22 @@ class KnowledgeAgent:
                 callbacks.append(handler)
 
         config: RunnableConfig = {"callbacks": callbacks} if callbacks else {}
-        result = await self._graph.ainvoke(
+        result = await graph.ainvoke(
             {"messages": [HumanMessage(content=user_message)]}, config=config
         )
 
         final: AIMessage = result["messages"][-1]
         answer = final.content if isinstance(final.content, str) else str(final.content)
         sources = _extract_sources(result["messages"])
+        context = "\n\n---\n\n".join(retrieved_context)
 
         return {
-            "context": "",
+            "context": context,
             "response": {"answer": answer, "source_agent": "knowledge", "sources": sources},
         }
 
 
-def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
+def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort, context_sink: list[str]):
     @lc_tool
     async def retrieve_from_kb(query: str) -> str:
         """Search Getnet's knowledge base for product and service information."""
@@ -93,6 +100,7 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
                 data = json.loads(cached)
                 if "context" in data:
                     logger.debug("KB retrieval cache hit.")
+                    context_sink.append(data["context"])
                     return data["context"]
             except (json.JSONDecodeError, KeyError):
                 pass
@@ -104,6 +112,7 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
         context = "\n\n---\n\n".join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
         sources = list(dict.fromkeys(c.source for c in chunks))
         await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
+        context_sink.append(context)
         return context
 
     return retrieve_from_kb

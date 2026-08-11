@@ -10,7 +10,7 @@ from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail
 from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.entities.Chat_Request import ChatRequest
-from src.domain.shared.State import AgentState
+from src.domain.shared.Agent_State import AgentState
 
 _CACHEABLE_AGENTS = {"knowledge", "off_topic", "general_search"}
 

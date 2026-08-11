@@ -4,12 +4,12 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Application_Errors import UserNotFoundError
-from src.domain.shared.State import AgentState
+from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class CustomerSupportAgent:
             _make_get_transactions_tool(user_repo),
             _make_get_settlement_tool(user_repo),
         ]
-        self._graph = _graph or create_react_agent(llm.as_runnable(), tools=tools)
+        self._graph = _graph or create_agent(llm.as_runnable(), tools=tools)
 
     async def run(self, state: AgentState) -> dict:
         user_id = state["user_id"]

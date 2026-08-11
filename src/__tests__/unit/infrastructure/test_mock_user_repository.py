@@ -1,5 +1,3 @@
-from datetime import timezone
-
 import pytest
 
 from src.domain.shared.Application_Errors import UserNotFoundError

@@ -9,7 +9,7 @@ from deepeval.metrics import AnswerRelevancyMetric, ContextualRelevancyMetric, F
 from deepeval.metrics import ContextualPrecisionMetric, ContextualRecallMetric
 from deepeval.test_case import LLMTestCase
 
-from src.domain.shared.State import AgentState
+from src.domain.shared.Agent_State import AgentState
 
 from src.application.guardrails.output_guardrail import _split_context
 from src.application.guardrails.input_guardrail import InputGuardrail
@@ -30,7 +30,7 @@ _THRESHOLDS = {
     "routing_accuracy": 0.90,
 }
 
-_METRIC_TIMEOUT = 20.0
+_METRIC_TIMEOUT = 300.0
 _EVAL_REDIS_KEY = "eval:latest"
 
 

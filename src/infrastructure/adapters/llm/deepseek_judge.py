@@ -1,4 +1,5 @@
 import asyncio
+import re
 from typing import Any
 
 from deepeval.models.base_model import DeepEvalBaseLLM
@@ -28,8 +29,10 @@ class DeepSeekJudgeModel(DeepEvalBaseLLM):
             model=self._model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
+            extra_body={"thinking": {"type": "disabled"}},  # disable thinking mode for faster judge calls
         )
-        return response.choices[0].message.content or ""
+        content = response.choices[0].message.content or ""
+        return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
     async def a_generate(self, *args: Any, **kwargs: Any) -> str:
         return await asyncio.to_thread(self.generate, *args, **kwargs)

@@ -1,9 +1,11 @@
 # pylint: disable=redefined-outer-name,protected-access
 import pytest
+import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 from pydantic import BaseModel
 
 from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
+from src.infrastructure.adapters.llm.llm_adapter import _with_retry
 
 
 class _Answer(BaseModel):
@@ -22,11 +24,8 @@ def mock_langfuse():
 def mock_chat_model():
     model = MagicMock()
     mock_msg = MagicMock()
-    mock_msg.content = "Test response from DeepSeek"
+    mock_msg.content = '{"text": "ok", "confidence": 0.9}'
     model.ainvoke = AsyncMock(return_value=mock_msg)
-    structured = MagicMock()
-    structured.ainvoke = AsyncMock(return_value=_Answer(text="ok", confidence=0.9))
-    model.with_structured_output = MagicMock(return_value=structured)
     return model
 
 
@@ -58,20 +57,18 @@ async def test_complete_structured_returns_schema_instance(adapter):
 
 async def test_complete_structured_traces_in_langfuse(adapter, mock_langfuse):
     await adapter.complete_structured("prompt", _Answer)
-    mock_langfuse.trace.assert_called_once_with(
-        "llm.complete_structured", {"prompt": "prompt", "schema": "_Answer"}
-    )
-    mock_langfuse.span.assert_called_once()
+    # complete_structured calls complete() internally — both emit a trace
+    calls = [c.args[0] for c in mock_langfuse.trace.call_args_list]
+    assert "llm.complete_structured" in calls
+    assert "llm.complete" in calls
 
 
 async def test_complete_structured_calls_with_structured_output(adapter, mock_chat_model):
-    await adapter.complete_structured("prompt", _Answer)
-    mock_chat_model.with_structured_output.assert_called_once_with(_Answer)
+    result = await adapter.complete_structured("prompt", _Answer)
+    assert isinstance(result, _Answer)
 
 
 async def test_complete_retries_on_rate_limit(mock_langfuse):
-    import httpx
-    from src.infrastructure.adapters.llm.llm_adapter import _with_retry
 
     calls = 0
 

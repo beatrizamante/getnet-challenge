@@ -11,7 +11,7 @@ from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseA
 logger = logging.getLogger(__name__)
 
 _DISCLAIMER = (
-    "\n\n Note: this response may not be fully grounded in Getnet's official documentation. "
+    "\n\n⚠️ Note: this response may not be fully grounded in Getnet's official documentation. "
     "Please verify with official support."
 )
 

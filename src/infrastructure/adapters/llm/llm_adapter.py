@@ -52,6 +52,7 @@ class LLMAdapter(LLMPort):
         """Run a structured completion whose output is validated against `schema`."""
         trace_id = self._langfuse.trace("llm.complete_structured", {"prompt": prompt, "schema": schema.__name__})
         text = await self.complete(prompt=prompt, system=system)
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
         cleaned = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
         match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         raw = match.group(0) if match else cleaned

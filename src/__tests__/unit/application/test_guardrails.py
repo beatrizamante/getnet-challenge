@@ -1,8 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import BaseModel
+import asyncio as _asyncio
 
-from src.application.guardrails.input_guardrail import InputGuardrail, InputGuardrailResult
+
+from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail, _split_context
 from src.domain.ports.LLM_Port import LLMPort
 from src.infrastructure.adapters.llm.deepseek_judge import DeepSeekJudgeModel
@@ -32,7 +35,6 @@ class TestInputGuardrail:
         llm.complete_structured.assert_not_called()
 
     async def test_passes_normal_getnet_question(self, guardrail, llm):
-        from pydantic import BaseModel
         class _Decision(BaseModel):
             safe: bool = True
             reason: str = "normal question"
@@ -106,7 +108,6 @@ class TestOutputGuardrail:
         assert "⚠️" in answer
 
     async def test_passes_through_on_timeout(self, guardrail):
-        import asyncio as _asyncio
         guardrail._metric = MagicMock()
         with patch("asyncio.wait_for", side_effect=_asyncio.TimeoutError):
             result = await guardrail.check("q", "a", "[Source: x]\nctx")

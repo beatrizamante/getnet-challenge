@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 
+from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
@@ -27,7 +28,10 @@ class EscalationAgent:
         self._redis = redis_client
 
     async def run(self, _: AgentState) -> dict:
-        return {"response": {"answer": _HANDOFF_ANSWER, "source_agent": "escalate", "sources": []}}
+        return {"response": AgentResponseModel.build(
+            answer=_HANDOFF_ANSWER,
+            source_agent="escalate",
+        ).model_dump()}
 
     async def log_escalation(self, user_id: str, message: str, reason: str = "") -> None:
         """Fire-and-forget: log escalation event to Langfuse + Redis audit list."""

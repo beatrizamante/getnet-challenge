@@ -16,10 +16,9 @@ _CACHEABLE_AGENTS = {"knowledge", "off_topic", "general_search"}
 
 router = APIRouter(tags=["chat"])
 
-#NOTE - PYBREAKER FUTURE ADDITION WHEN IN PRODUCTION TO DEAL WITH INTERNAL OR EXTERNAL SERVER PROBLEMS AND NOT BREAK THE APP
-#TODO - BETTER SCHEMA VALIDATION ON OUTPUT BETWEEN AGENTS
-#TODO - TOOL MAX ATTEMPTS/REPETITIONS
-#TODO - TRY/CATCH ERRORS BACK TO THE MODEL (IF APPLICABLE)
+#NOTE - PYBREAKER future addition for production circuit-breaking
+#TODO - tool max attempts/repetitions
+#TODO - try/catch errors back to the model (if applicable)
 
 async def _graph(container: Annotated[Container, Depends(get_container)]):
     return await container.agent_graph.async_()
@@ -50,10 +49,9 @@ async def chat(
     """Run the agent orchestration graph and return a structured response."""
     guard_result = await input_guard.check(body.message)
     if guard_result.blocked:
-        return AgentResponseModel(
+        return AgentResponseModel.build(
             answer=guard_result.safe_response,
             source_agent="guardrail",
-            sources=[],
         )
 
     cached_json = await cache.get(body.message)
@@ -76,7 +74,7 @@ async def chat(
             question=body.message, answer=answer, context=context
         )
 
-    response = AgentResponseModel(
+    response = AgentResponseModel.build(
         answer=answer,
         source_agent=source_agent,
         sources=raw.get("sources") or [],

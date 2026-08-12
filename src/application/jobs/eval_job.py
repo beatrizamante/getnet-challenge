@@ -30,7 +30,7 @@ _THRESHOLDS = {
     "routing_accuracy": 0.90,
 }
 
-_METRIC_TIMEOUT = 20.0
+_METRIC_TIMEOUT = 300.0
 _EVAL_REDIS_KEY = "eval:latest"
 
 

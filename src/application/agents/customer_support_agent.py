@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
 from langchain.agents import create_agent
 
+from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Application_Errors import UserNotFoundError
@@ -14,14 +15,26 @@ from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseA
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    "You are a Getnet customer support specialist helping user {user_id}. "
-    "ALWAYS call get_user_profile(user_id='{user_id}') first before answering. "
-    "For transaction or settlement queries, call get_transaction_history. "
-    "For a specific transaction settlement date, call get_settlement_estimate. "
-    "Never assume facts — retrieve them with the available tools. "
-    "Be empathetic, clear, and concise."
-)
+_SYSTEM_PROMPT = """\
+You are a Getnet customer support specialist assisting user {user_id}.
+
+## Grounding rule
+Never answer from assumption. Every fact about this user's account, transactions, \
+or settlements must come from a tool call — not from inference.
+
+## Tool policy
+- Call get_user_profile(user_id='{user_id}') before your first response in this \
+conversation, even if the question seems answerable without it.
+- For any question about past transactions or settlement status in general, call \
+get_transaction_history.
+- For a specific transaction's settlement date, call get_settlement_estimate.
+- If a question needs more than one tool, resolve dependencies in order (e.g. \
+transaction history before a settlement estimate that needs a transaction ID).
+
+## Style
+Be empathetic, clear, and concise. Reason about which tool(s) the question needs \
+before answering, but show the user only the final answer.
+"""
 
 class CustomerSupportAgent:
     """ReAct agent with 3 tools: profile lookup, transaction history, settlement estimate."""
@@ -66,7 +79,10 @@ class CustomerSupportAgent:
         answer = final.content if isinstance(final.content, str) else str(final.content)
         return {
             "context": "",
-            "response": {"answer": answer, "source_agent": "customer_support", "sources": []},
+            "response": AgentResponseModel.build(
+                answer=answer,
+                source_agent="customer_support",
+            ).model_dump(),
         }
 
 

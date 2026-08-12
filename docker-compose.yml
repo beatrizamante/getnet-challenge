@@ -1,0 +1,95 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
+    env_file: .env
+    ports:
+      - "8080:8080"
+    environment:
+      CHROMA_HOST: chromadb
+      REDIS_HOST: redis
+    volumes:
+      - hf-cache:/app/hf_cache
+    networks: [getnet-net]
+    depends_on:
+      chromadb:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8080/health'')" || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  chromadb:
+    image: chromadb/chroma:latest
+    environment:
+      IS_PERSISTENT: "TRUE"
+    volumes:
+      - chroma-data:/data
+    networks: [getnet-net]
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    networks: [getnet-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  arq-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
+    command: ["arq", "src.interface.workers.WorkerSettings"]
+    env_file: .env
+    environment:
+      REDIS_HOST: redis
+      CHROMA_HOST: chromadb
+    volumes:
+      - hf-cache:/app/hf_cache
+    networks: [getnet-net]
+    depends_on:
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+
+  # One-shot seed container — run with: docker compose run --rm ingest
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
+    command: ["python", "scripts/ingest.py"]
+    env_file: .env
+    environment:
+      CHROMA_HOST: chromadb
+      REDIS_HOST: redis
+    volumes:
+      - hf-cache:/app/hf_cache
+    networks: [getnet-net]
+    depends_on:
+      chromadb:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    profiles: ["tools"]
+
+networks:
+  getnet-net:
+    driver: bridge
+
+volumes:
+  chroma-data:
+  redis-data:
+  hf-cache:

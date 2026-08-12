@@ -1,0 +1,43 @@
+[project]
+name = "getnet-challenge"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Beatriz Amante", email = "beatrizamante@hotmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "arq>=0.25.0",
+    "chromadb>=1.5.9",
+    "deepeval>=4.1.5",
+    "dependency-injector>=4.49.1",
+    "fastapi[standard]>=0.141.1",
+    "langchain>=1.3.14",
+    "langchain-openai>=1.4.2",
+    "langchain-text-splitters>=1.1.2",
+    "langfuse>=4.14.3",
+    "langgraph>=1.2.10",
+    "openai>=2.53.0",
+    "pydantic>=2.13.4",
+    "redis>=8.1.0",
+    "sentence-transformers>=5.7.0",
+    "tavily-python>=0.7.27",
+]
+
+[project.scripts]
+getnet-challenge = "src.main:main"
+
+[dependency-groups]
+dev = [
+    "fakeredis>=2.37.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["src/__tests__"]

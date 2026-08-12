@@ -1,0 +1,24 @@
+# Local dev: hot reload + ports exposed + memory limits
+services:
+  app:
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+    volumes:
+      - ./src:/app/src
+    ports:
+      - "8080:8080"
+    mem_limit: 1.5g
+
+  arq-worker:
+    volumes:
+      - ./src:/app/src
+    mem_limit: 1g
+
+  chromadb:
+    ports:
+      - "8000:8000"
+    mem_limit: 512m
+
+  redis:
+    ports:
+      - "6379:6379"
+    mem_limit: 128m

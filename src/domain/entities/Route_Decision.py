@@ -1,13 +1,15 @@
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
+Intent = Literal["knowledge", "customer_support", "general_search", "escalate", "off_topic"]
+
 
 class RouteDecisionModel(BaseModel):
-    """Router Agent output used to dispatch to the correct specialized agent."""
+    """Router Agent output. confidence is intentionally absent — the LLM expresses uncertainty via intent=escalate."""
 
-    intent: str = Field(min_length=1)
-    confidence: float = Field(ge=0.0, le=1.0)
+    intent: Intent
     target_agent: str = Field(min_length=1)
+    reasoning: str = Field(min_length=1)
 
 RouteDecision: TypeAlias = RouteDecisionModel

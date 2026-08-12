@@ -10,10 +10,11 @@ logger = CONTAINER.logger()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Initializes modules on app start instead of waiting for a request"""
     settings = CONTAINER.settings()
     logger.info("Settings loaded. env=%s", settings.app.env)
+    await CONTAINER.init_resources()  # type: ignore[misc]
     yield
+    await CONTAINER.shutdown_resources()  # type: ignore[misc]
 
 app = FastAPI(lifespan=lifespan)
 

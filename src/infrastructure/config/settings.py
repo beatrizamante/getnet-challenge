@@ -9,7 +9,8 @@ class LLMSettings(BaseSettings):
 
     provider: str = Field(default="openai")  # openai | anthropic | gemini
     llm_api_key: str = Field(default="")
-    llm_model: str = Field(default="gpt-4o")
+    llm_model: str = Field(default="deepseek-chat")
+    base_url: str = Field(default="https://api.deepseek.com")
 
 class ChromaDBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CHROMA_", env_file=".env", extra="ignore")
@@ -26,6 +27,7 @@ class RedisSettings(BaseSettings):
     password: str = Field(default="")
     db: int = Field(default=0)
     ttl: int = Field(default=3600)
+    cache_similarity_threshold: float = Field(default=0.92)
 
     @property
     def url(self) -> str:
@@ -41,6 +43,28 @@ class LangfuseSettings(BaseSettings):
     public_key: str = Field(default="")
     host: str = Field(default="https://cloud.langfuse.com")
     enabled: bool = Field(default=False)
+
+
+class EmbeddingSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="HF_", env_file=".env", extra="ignore")
+
+    model_name: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
+
+
+class SearchSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="SEARCH_", env_file=".env", extra="ignore")
+
+    api_key: str = Field(default="")
+    max_results: int = Field(default=5)
+
+
+class IngestionSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_", env_file=".env", extra="ignore")
+
+    chunk_size: int = Field(default=512)
+    chunk_overlap: int = Field(default=64)
+    request_delay: float = Field(default=1.5)  # seconds between page ingestions in the job
+    max_concurrent: int = Field(default=3)     # max parallel HTTP requests in scraper
 
 
 class AppSettings(BaseSettings):
@@ -59,7 +83,10 @@ class Settings(BaseSettings):
     chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    search: SearchSettings = Field(default_factory=SearchSettings)
     app: AppSettings = Field(default_factory=AppSettings)
+    ingestion: IngestionSettings = Field(default_factory=IngestionSettings)
 
 
 @lru_cache(maxsize=1)

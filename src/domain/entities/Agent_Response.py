@@ -8,7 +8,8 @@ class AgentResponseModel(BaseModel):
 
     answer: str = Field(min_length=1)
     source_agent: str = Field(min_length=1)
-    confidence: float = Field(ge=0.0, le=1.0)
+    # Populated by offline evaluation (deepeval), not at inference time
+    confidence: float | None = None
     sources: list[str]
 
 AgentResponse: TypeAlias = AgentResponseModel

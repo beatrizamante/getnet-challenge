@@ -9,7 +9,7 @@ from langgraph.prebuilt import create_react_agent
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Application_Errors import UserNotFoundError
-from src.domain.shared.state import AgentState
+from src.domain.shared.State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,8 @@ def _make_get_profile_tool(user_repo: UserRepositoryPort):
         """Retrieve the account profile (plan, machine model, status, join date) for the given user_id."""
         try:
             p = await user_repo.get_profile(user_id)
+            if p is None:
+                return f"No account found for user '{user_id}'."
             return (
                 f"Plan: {p.plan}\n"
                 f"Machine: {p.machine_model}\n"

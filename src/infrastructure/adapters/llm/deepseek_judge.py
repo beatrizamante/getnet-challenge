@@ -18,20 +18,21 @@ class DeepSeekJudgeModel(DeepEvalBaseLLM):
         self._model_name = model_name
         super().__init__(model_name)
 
-    def load_model(self) -> OpenAI:
+    def load_model(self, *args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportReturnType]
         return OpenAI(api_key=self._api_key, base_url=self._base_url)
 
-    def generate(self, prompt: str, schema: Any = None) -> tuple[str, float]:
-        client = self.load_model()
+    def generate(self, *args: Any, **kwargs: Any) -> str:
+        prompt: str = args[0] if args else str(kwargs.get("prompt", ""))
+        client: OpenAI = self.load_model()
         response = client.chat.completions.create(
             model=self._model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
         )
-        return response.choices[0].message.content or "", 0.0
+        return response.choices[0].message.content or ""
 
-    async def a_generate(self, prompt: str, schema: Any = None) -> tuple[str, float]:
-        return await asyncio.to_thread(self.generate, prompt, schema)
+    async def a_generate(self, *args: Any, **kwargs: Any) -> str:
+        return await asyncio.to_thread(self.generate, *args, **kwargs)
 
-    def get_model_name(self) -> str:
+    def get_model_name(self, *args: Any, **kwargs: Any) -> str:
         return self._model_name

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import json, re
+
 from typing import Any, Awaitable, Callable, TypeVar
 
 import httpx
@@ -27,7 +29,7 @@ class LLMAdapter(LLMPort):
     def __init__(self, settings: LLMSettings, langfuse: LangfuseAdapter) -> None:
         self._model = ChatOpenAI(
             model=settings.llm_model,
-            openai_api_key=settings.llm_api_key,  # type: ignore[arg-type]
+            openai_api_key=settings.api_key,  # type: ignore[arg-type]
             base_url=settings.base_url,
             max_retries=0,  # retries handled by _with_retry below
         )
@@ -48,21 +50,13 @@ class LLMAdapter(LLMPort):
 
     async def complete_structured(self, prompt: str, schema: type[T], system: str = "") -> T:
         """Run a structured completion whose output is validated against `schema`."""
-        trace_id = self._langfuse.trace(
-            "llm.complete_structured", {"prompt": prompt, "schema": schema.__name__}
-        )
-        structured = self._model.with_structured_output(schema)
-        if system:
-            messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
-            result: T = await _with_retry(structured.ainvoke, messages)  # type: ignore[assignment]
-        else:
-            result = await _with_retry(structured.ainvoke, prompt)  # type: ignore[assignment]
-        self._langfuse.span(
-            trace_id,
-            "llm.complete_structured",
-            input_data={"prompt": prompt},
-            output={"output": result.model_dump()},
-        )
+        trace_id = self._langfuse.trace("llm.complete_structured", {"prompt": prompt, "schema": schema.__name__})
+        text = await self.complete(prompt=prompt, system=system)
+        cleaned = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        raw = match.group(0) if match else cleaned
+        result = schema.model_validate(json.loads(raw))
+        self._langfuse.span(trace_id, "llm.complete_structured", input_data={"prompt": prompt}, output={"output": result.model_dump()})
         return result
 
 

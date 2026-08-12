@@ -26,7 +26,7 @@ class EscalationAgent:
         self._langfuse = langfuse
         self._redis = redis_client
 
-    async def run(self, state: AgentState) -> dict:
+    async def run(self, _: AgentState) -> dict:
         return {"response": {"answer": _HANDOFF_ANSWER, "source_agent": "escalate", "sources": []}}
 
     async def log_escalation(self, user_id: str, message: str, reason: str = "") -> None:

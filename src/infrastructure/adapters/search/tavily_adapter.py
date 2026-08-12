@@ -9,6 +9,7 @@ from src.infrastructure.config.settings import SearchSettings
 
 logger = logging.getLogger(__name__)
 
+#NOTE - COULD HAVE BEEN AN MCP SERVER HERE, BUT FOR THE PROJECT'S SIZE, THE GAIN WOULD'VE BEEN MINIMAL
 
 class TavilySearchAdapter(SearchPort):
     """SearchPort backed by Tavily — optimised for RAG retrieval over web content."""

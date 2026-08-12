@@ -2,7 +2,6 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
-from pydantic import BaseModel, Field
 
 from src._lib.container import Container, get_container
 from src.application.agents.escalation_agent import EscalationAgent
@@ -10,35 +9,29 @@ from src.application.caching.semantic_cache_service import SemanticCacheService
 from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail
 from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Chat_Request import ChatRequest
 from src.domain.shared.State import AgentState
 
-# Responses from these agents are user-agnostic and safe to cache
 _CACHEABLE_AGENTS = {"knowledge", "off_topic", "general_search"}
 
 router = APIRouter(tags=["chat"])
 
+#NOTE - PYBREAKER FUTURE ADDITION WHEN IN PRODUCTION TO DEAL WITH INTERNAL OR EXTERNAL SERVER PROBLEMS AND NOT BREAK THE APP
+#TODO - BETTER SCHEMA VALIDATION ON OUTPUT BETWEEN AGENTS
+#TODO - TOOL MAX ATTEMPTS/REPETITIONS
+#TODO - TRY/CATCH ERRORS BACK TO THE MODEL (IF APPLICABLE)
 
-class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=2000)
-    user_id: str = Field(min_length=1, max_length=100)
-    session_id: str | None = None
+async def _graph(container: Annotated[Container, Depends(get_container)]):
+    return await container.agent_graph.async_()
 
-
-def _graph(container: Annotated[Container, Depends(get_container)]):
-    return container.agent_graph()
-
-
-def _escalation(container: Annotated[Container, Depends(get_container)]) -> EscalationAgent:
+async def _escalation(container: Annotated[Container, Depends(get_container)]) -> EscalationAgent:
     return container.escalation_agent()
-
 
 def _input_guard(container: Annotated[Container, Depends(get_container)]) -> InputGuardrail:
     return container.input_guardrail()
 
-
 def _output_guard(container: Annotated[Container, Depends(get_container)]) -> OutputGuardrail:
     return container.output_guardrail()
-
 
 def _cache(container: Annotated[Container, Depends(get_container)]) -> SemanticCacheService:
     return container.semantic_cache_service()
@@ -63,7 +56,6 @@ async def chat(
             sources=[],
         )
 
-    # Semantic cache: skip graph for user-agnostic questions already answered
     cached_json = await cache.get(body.message)
     if cached_json:
         return AgentResponseModel.model_validate_json(cached_json)
@@ -90,7 +82,6 @@ async def chat(
         sources=raw.get("sources") or [],
     )
 
-    # Cache user-agnostic responses — customer_support and escalate are never cached
     if source_agent in _CACHEABLE_AGENTS:
         await cache.set(body.message, response.model_dump_json())
 

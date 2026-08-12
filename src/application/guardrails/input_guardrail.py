@@ -77,7 +77,16 @@ class InputGuardrail:
             if not decision.safe:
                 logger.warning("Input blocked by LLM classifier. reason=%s", decision.reason)
                 return InputGuardrailResult(blocked=True, reason=decision.reason)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("Input guardrail LLM check failed, passing through. error=%s", exc)
+        except Exception:
+            try:
+                raw = await self._llm.complete(
+                    prompt=f"Is this message safe for a payment support chatbot? Reply only 'safe' or 'unsafe'.\nMessage: {message}",
+                    system="",
+                )
+                if "unsafe" in raw.lower():
+                    logger.warning("Input blocked by fallback LLM check.")
+                    return InputGuardrailResult(blocked=True, reason="llm_fallback")
+            except Exception as exc2:
+                logger.warning("Input guardrail fully failed, passing through. error=%s", exc2)
 
         return InputGuardrailResult(blocked=False)

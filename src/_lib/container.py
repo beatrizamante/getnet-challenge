@@ -68,10 +68,17 @@ def _make_cache(
 
 
 async def _chroma_client_resource(settings: Settings):
-    """Async resource: opened on container.init_resources(), closed on shutdown."""
-    client = await chromadb.AsyncHttpClient(
-        host=settings.chroma.host, port=settings.chroma.port
-    )
+    """Lazy-connect async resource: yields None on startup failure so the app boots without ChromaDB."""
+    import logging
+    _logger = logging.getLogger(__name__)
+    try:
+        client = await chromadb.AsyncHttpClient(
+            host=settings.chroma.host, port=settings.chroma.port
+        )
+        _logger.info("ChromaDB connected. host=%s port=%d", settings.chroma.host, settings.chroma.port)
+    except Exception as exc:  # pylint: disable=broad-except
+        _logger.warning("ChromaDB unavailable at startup — vector store disabled. error=%s", exc)
+        client = None
     yield client
 
 
@@ -123,7 +130,7 @@ def _make_input_guardrail(llm: LLMAdapter) -> InputGuardrail:
 
 def _make_output_guardrail(settings: Settings, langfuse: LangfuseAdapter) -> OutputGuardrail:
     judge = DeepSeekJudgeModel(
-        api_key=settings.llm.llm_api_key,
+        api_key=settings.llm.api_key,
         base_url=settings.llm.base_url,
         model_name=settings.guardrail.model,
     )

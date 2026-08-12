@@ -10,9 +10,7 @@ class UserRepositoryPort(ABC):
     @abstractmethod
     async def get_profile(self, user_id: str) -> UserProfile | None:
         """Return the user's profile. Raises UserNotFoundError for unknown user_id."""
-        ...
 
     @abstractmethod
     async def get_transactions(self, user_id: str, days: int) -> list[Transaction]:
-        """Return transactions within the last `days`. Raises UserNotFoundError for unknown user_id."""
-        ...
+        """Return transactions within the last `days`. Raises Error for unknown user_id."""

@@ -75,7 +75,6 @@ _TRANSACTIONS: dict[str, list[Transaction]] = {
     ],
 }
 
-
 class MockUserRepository(UserRepositoryPort):
     """Deterministic seed-based repository — designed for development and integration tests."""
 

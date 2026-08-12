@@ -8,7 +8,7 @@ class UserRepositoryPort(ABC):
     """Contract for retrieving user data (profile and transaction history)."""
 
     @abstractmethod
-    async def get_profile(self, user_id: str) -> UserProfile:
+    async def get_profile(self, user_id: str) -> UserProfile | None:
         """Return the user's profile. Raises UserNotFoundError for unknown user_id."""
         ...
 

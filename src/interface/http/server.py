@@ -1,25 +1,18 @@
 import logging
 import uvicorn
 
-def make_server():
-    """
-    Configures and returns a Uvicorn server instance for the FastAPI application.
+from src.infrastructure.config.settings import AppSettings
 
-    The server is set up to run on host '0.0.0.0' and port 5000, with debug-level logging and colored output.
-    Logs the configuration process using the 'getnet-challenge' logger.
-
-    Returns:
-        uvicorn.Server: A configured Uvicorn server instance ready to be started.
-    """
-    logger = logging.getLogger("getnet-challenge")
-    logger.info("Configuring server...")
-
-    config = uvicorn.Config("main:app",
-                        host="0.0.0.0",
-                        port=5000,
-                        log_level="debug",
-                        use_colors=True
-                        )
+def make_server() -> uvicorn.Server:
+    logger = logging.getLogger(__name__)
+    app_cfg = AppSettings()
+    config = uvicorn.Config(
+        "src.main:app",
+        host=app_cfg.host,
+        port=app_cfg.port,
+        log_level=str(app_cfg.log_level).lower(),
+        use_colors=True,
+    )
     server = uvicorn.Server(config)
-    logger.info("Server configured successfully")
+    logger.info("Server configured. host=%s port=%d", app_cfg.host, app_cfg.port)
     return server

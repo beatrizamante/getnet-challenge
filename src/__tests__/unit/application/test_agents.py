@@ -9,7 +9,6 @@ from src.application.agents.customer_support_agent import (
     _make_get_settlement_tool,
     _make_get_transactions_tool,
 )
-from src.domain.shared.state import AgentOutput
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.domain.entities.Chunk import Chunk
 from src.domain.entities.Route_Decision import RouteDecisionModel

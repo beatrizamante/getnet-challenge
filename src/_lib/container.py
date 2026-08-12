@@ -10,12 +10,17 @@ from src.application.agents.graph import build_graph
 from src.application.agents.knowledge_agent import KnowledgeAgent
 from src.application.agents.router_agent import RouterAgent
 from src.application.caching.semantic_cache_service import SemanticCacheService
+from src.application.guardrails.input_guardrail import InputGuardrail
+from src.application.guardrails.output_guardrail import OutputGuardrail
 from src.application.rag_pipeline.ingest_service import RagIngestService
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
+from src.domain.ports.Reranker_Port import RerankerPort
 from src.config.logger import setup_logging
 from src.infrastructure.adapters.cache.redis_cache_adapter import RedisCacheAdapter
 from src.infrastructure.adapters.embeddings.huggingface_adapter import HuggingFaceEmbeddingAdapter
+from src.infrastructure.adapters.reranker.cross_encoder_reranker import CrossEncoderReranker
 from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
+from src.infrastructure.adapters.llm.deepseek_judge import DeepSeekJudgeModel
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.queue.arq_adapter import ArqQueueAdapter
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
@@ -90,8 +95,16 @@ def _make_ingest_service(settings: Settings, vector_store: ChromaAdapter) -> Rag
     )
 
 
-def _make_retrieval_service(vector_store: ChromaAdapter) -> RagRetrievalService:
-    return RagRetrievalService(vector_store=vector_store)
+def _make_retrieval_service(settings: Settings, vector_store: ChromaAdapter) -> RagRetrievalService:
+    reranker: RerankerPort | None = None
+    if settings.reranker.enabled:
+        reranker = CrossEncoderReranker(model_name=settings.reranker.model)
+    return RagRetrievalService(
+        vector_store=vector_store,
+        reranker=reranker,
+        top_n=settings.reranker.top_n,
+        rerank_factor=settings.reranker.factor,
+    )
 
 
 def _make_semantic_cache(cache: RedisCacheAdapter, llm: LLMAdapter) -> SemanticCacheService:
@@ -102,6 +115,19 @@ def _make_escalation_agent(
     langfuse: LangfuseAdapter, redis_client: aioredis.Redis
 ) -> EscalationAgent:
     return EscalationAgent(langfuse=langfuse, redis_client=redis_client)
+
+
+def _make_input_guardrail(llm: LLMAdapter) -> InputGuardrail:
+    return InputGuardrail(llm=llm)
+
+
+def _make_output_guardrail(settings: Settings, langfuse: LangfuseAdapter) -> OutputGuardrail:
+    judge = DeepSeekJudgeModel(
+        api_key=settings.llm.llm_api_key,
+        base_url=settings.llm.base_url,
+        model_name=settings.guardrail.model,
+    )
+    return OutputGuardrail(judge=judge, langfuse=langfuse, threshold=settings.guardrail.faithfulness_threshold)
 
 
 def _make_user_repo() -> MockUserRepository:
@@ -171,6 +197,7 @@ class Container(containers.DeclarativeContainer):
     )
 
     _chroma_client = providers.Resource(_chroma_client_resource, settings=settings)
+    chroma_client = _chroma_client  # public alias for health checks
     vector_store_port = providers.Singleton(
         _make_vector_store,
         settings=settings,
@@ -181,7 +208,9 @@ class Container(containers.DeclarativeContainer):
     ingest_service = providers.Singleton(
         _make_ingest_service, settings=settings, vector_store=vector_store_port
     )
-    retrieval_service = providers.Singleton(_make_retrieval_service, vector_store=vector_store_port)
+    retrieval_service = providers.Singleton(
+        _make_retrieval_service, settings=settings, vector_store=vector_store_port
+    )
     semantic_cache_service = providers.Singleton(
         _make_semantic_cache, cache=cache_port, llm=llm_port
     )
@@ -202,6 +231,10 @@ class Container(containers.DeclarativeContainer):
     )
     escalation_agent = providers.Singleton(
         _make_escalation_agent, langfuse=langfuse_adapter, redis_client=redis_client
+    )
+    input_guardrail = providers.Singleton(_make_input_guardrail, llm=llm_port)
+    output_guardrail = providers.Singleton(
+        _make_output_guardrail, settings=settings, langfuse=langfuse_adapter
     )
     agent_graph = providers.Singleton(
         _make_agent_graph,

@@ -19,6 +19,11 @@ class ChromaAdapter(VectorStorePort):
         self._collection_name = collection_name
         self._collection = None
 
+    async def ping(self) -> bool:
+        """Return True if the ChromaDB server is reachable."""
+        await self._client.heartbeat()
+        return True
+
     async def _get_collection(self):
         """Lazily resolve the ChromaDB collection, creating it if it does not exist yet."""
         if self._collection is None:

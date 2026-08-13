@@ -8,7 +8,7 @@ from src.domain.ports.Vector_Store_Port import VectorStorePort
 
 logger = logging.getLogger(__name__)
 
-
+#NOTE - In more complex programs, for instance an roleplay agent, you'd need to chunk the query as well and make a batch similarity search
 class ChromaAdapter(VectorStorePort):
     """VectorStorePort backed by ChromaDB using cosine similarity over HuggingFace embeddings."""
 

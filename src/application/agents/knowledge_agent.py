@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from typing import Any
 
@@ -153,7 +154,6 @@ def _make_web_search_tool(search: SearchPort):
 
 def _sanitize_snippet(text: str, max_chars: int = 400) -> str:
     """Strip HTML tags and cap length — reduces indirect prompt injection surface."""
-    import re
     clean = re.sub(r"<[^>]+>", "", text)
     return re.sub(r"\s+", " ", clean).strip()[:max_chars]
 

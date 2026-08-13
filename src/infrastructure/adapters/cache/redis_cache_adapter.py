@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _INDEX_KEY = "semantic_cache:index"
 _PREFIX = "semantic_cache:"
-
+#TODO - For now, the caching is only used for KB retrieval, but for a full on app, we'd need to make an index key for chat history and another for the knowledge base
 
 class RedisCacheAdapter(CachePort):
     """Semantic cache backed by Redis: hits are resolved by embedding cosine similarity, not exact key equality."""

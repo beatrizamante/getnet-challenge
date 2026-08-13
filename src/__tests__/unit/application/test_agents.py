@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 
 from src.application.agents.router_agent import RouterAgent
-from src.application.agents.knowledge_agent import KnowledgeAgent, _make_retrieve_tool
+from src.application.agents.knowledge_agent import KnowledgeAgent, _make_retrieve_tool, _retrieved_ctx
 from src.application.agents.customer_support_agent import (
     CustomerSupportAgent,
     _make_get_profile_tool,
@@ -200,8 +200,12 @@ class TestKnowledgeAgent:
         cache = AsyncMock(spec=CachePort)
         cache.get.return_value = None
 
-        tool = _make_retrieve_tool(retrieval, cache, [])
-        result = await tool.ainvoke({"query": "payment methods"})
+        tool = _make_retrieve_tool(retrieval, cache)
+        token = _retrieved_ctx.set([])
+        try:
+            result = await tool.ainvoke({"query": "payment methods"})
+        finally:
+            _retrieved_ctx.reset(token)
 
         assert "info" in result
         cache.set.assert_called_once()
@@ -213,8 +217,12 @@ class TestKnowledgeAgent:
         cache = AsyncMock(spec=CachePort)
         cache.get.return_value = json.dumps({"context": "cached ctx", "sources": []})
 
-        tool = _make_retrieve_tool(retrieval, cache, [])
-        result = await tool.ainvoke({"query": "q"})
+        tool = _make_retrieve_tool(retrieval, cache)
+        token = _retrieved_ctx.set([])
+        try:
+            result = await tool.ainvoke({"query": "q"})
+        finally:
+            _retrieved_ctx.reset(token)
 
         assert result == "cached ctx"
         retrieval.retrieve_chunks.assert_not_called()

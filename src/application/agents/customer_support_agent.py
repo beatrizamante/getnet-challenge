@@ -11,6 +11,7 @@ from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Application_Errors import UserNotFoundError
 from src.domain.shared.Agent_State import AgentState
+from src.domain.shared.constants import REACT_MAX_ITERATIONS
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,10 @@ class CustomerSupportAgent:
             if handler:
                 callbacks.append(handler)
 
-        config: RunnableConfig = {"callbacks": callbacks} if callbacks else {}
+        config: RunnableConfig = {
+            "callbacks": callbacks,
+            "recursion_limit": REACT_MAX_ITERATIONS,
+        }
         result = await self._graph.ainvoke({"messages": messages}, config=config)
 
         final: AIMessage = result["messages"][-1]

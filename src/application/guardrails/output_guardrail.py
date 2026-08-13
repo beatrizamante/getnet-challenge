@@ -7,6 +7,7 @@ from deepeval.test_case import LLMTestCase
 
 from src.infrastructure.adapters.llm.deepseek_judge import DeepSeekJudgeModel
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
+from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ _JUDGE_TIMEOUT = 10.0
 @dataclass
 class OutputGuardrailResult:
     passed: bool
-    score: float
+    score: float | None  # None means evaluation was skipped (timeout or error)
     reason: str = ""
     disclaimer_added: bool = False
 
@@ -82,17 +83,17 @@ class OutputGuardrail:
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Output guardrail failed — passing through. error=%s", exc)
 
-        return OutputGuardrailResult(passed=True, score=-1.0, reason="evaluation skipped")
+        return OutputGuardrailResult(passed=True, score=None, reason="evaluation skipped")
 
     async def apply(self, question: str, answer: str, context: str, trace_id: str = "") -> str:
         """Run the check and return the answer (with disclaimer appended if flagged)."""
         result = await self.check(question, answer, context, trace_id)
-        if not result.passed and result.score >= 0:
+        if not result.passed and result.score is not None:
             return answer + _DISCLAIMER
         return answer
 
 
 def _split_context(context: str) -> list[str]:
     """Recover individual source chunks from the formatted context string."""
-    parts = [p.strip() for p in context.split("\n\n---\n\n")]
+    parts = [p.strip() for p in context.split(CONTEXT_CHUNK_SEPARATOR)]
     return [p for p in parts if p]

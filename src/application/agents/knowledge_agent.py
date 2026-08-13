@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+from contextvars import ContextVar
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -14,9 +15,12 @@ from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
 from src.domain.shared.Agent_State import AgentState
+from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR, REACT_MAX_ITERATIONS
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
+
+_retrieved_ctx: ContextVar[list[str]] = ContextVar("retrieved_context")
 
 _SYSTEM_PROMPT = """\
 You are a Getnet product specialist.
@@ -38,12 +42,11 @@ it came from. If neither tool surfaces an answer, say so plainly — never inven
 facts about Getnet products, fees, or policies.
 """
 
-
 _KB_CACHE_TTL = 1800  # 30 min
 
 
 class KnowledgeAgent:
-    """LangGraph ReAct agent — the LLM decides which tool to call and when to stop."""
+    """LangGraph ReAct agent — graph compiled once; per-request context via ContextVar."""
 
     def __init__(
         self,
@@ -54,46 +57,46 @@ class KnowledgeAgent:
         langfuse: LangfuseAdapter | None = None,
         _graph: Any = None,
     ) -> None:
-        self._llm = llm
         self._langfuse = langfuse
-        self._retrieval = retrieval
-        self._search = search
-        self._cache = cache
-        self._graph_override = _graph
+        tools = [
+            _make_retrieve_tool(retrieval, cache),
+            _make_web_search_tool(search),
+        ]
+        self._graph = _graph or create_agent(
+            llm.as_runnable(),
+            tools=tools,
+            system_prompt=_SYSTEM_PROMPT,
+        )
 
     async def run(self, state: AgentState) -> dict:
         user_message = state["messages"][-1] if state.get("messages") else ""
         user_id = str(state.get("user_id", ""))
         session_id = str(state.get("session_id", ""))
 
-        retrieved_context: list[str] = []
-        tools = [
-            _make_retrieve_tool(self._retrieval, self._cache, retrieved_context),
-            _make_web_search_tool(self._search),
-        ]
-        graph = self._graph_override or create_agent(
-            self._llm.as_runnable(),
-            tools=tools,
-            system_prompt=_SYSTEM_PROMPT,
-        )
+        token = _retrieved_ctx.set([])
+        try:
+            callbacks = []
+            if self._langfuse:
+                handler = self._langfuse.get_callback_handler(
+                    user_id=user_id, session_id=session_id, trace_name="knowledge_agent"
+                )
+                if handler:
+                    callbacks.append(handler)
 
-        callbacks = []
-        if self._langfuse:
-            handler = self._langfuse.get_callback_handler(
-                user_id=user_id, session_id=session_id, trace_name="knowledge_agent"
+            config: RunnableConfig = {
+                "callbacks": callbacks,
+                "recursion_limit": REACT_MAX_ITERATIONS,
+            }
+            result = await self._graph.ainvoke(
+                {"messages": [HumanMessage(content=user_message)]}, config=config
             )
-            if handler:
-                callbacks.append(handler)
 
-        config: RunnableConfig = {"callbacks": callbacks} if callbacks else {}
-        result = await graph.ainvoke(
-            {"messages": [HumanMessage(content=user_message)]}, config=config
-        )
-
-        final: AIMessage = result["messages"][-1]
-        answer = final.content if isinstance(final.content, str) else str(final.content)
-        sources = _extract_sources(result["messages"])
-        context = "\n\n---\n\n".join(retrieved_context)
+            final: AIMessage = result["messages"][-1]
+            answer = final.content if isinstance(final.content, str) else str(final.content)
+            sources = _extract_sources(result["messages"])
+            context = CONTEXT_CHUNK_SEPARATOR.join(_retrieved_ctx.get())
+        finally:
+            _retrieved_ctx.reset(token)
 
         return {
             "context": context,
@@ -105,18 +108,18 @@ class KnowledgeAgent:
         }
 
 
-def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort, context_sink: list[str]):
+def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
     @lc_tool
     async def retrieve_from_kb(query: str) -> str:
         """Search Getnet's knowledge base for product and service information."""
-        cache_key = f"kb:{query}"
+        cache_key = f"kb:{query.lower().strip()}"
         cached = await cache.get(cache_key)
         if cached:
             try:
                 data = json.loads(cached)
                 if "context" in data:
                     logger.debug("KB retrieval cache hit.")
-                    context_sink.append(data["context"])
+                    _retrieved_ctx.get().append(data["context"])
                     return data["context"]
             except (json.JSONDecodeError, KeyError):
                 pass
@@ -125,10 +128,10 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort, contex
         if not chunks:
             return ""
 
-        context = "\n\n---\n\n".join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
+        context = CONTEXT_CHUNK_SEPARATOR.join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
         sources = list(dict.fromkeys(c.source for c in chunks))
         await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
-        context_sink.append(context)
+        _retrieved_ctx.get().append(context)
         return context
 
     return retrieve_from_kb

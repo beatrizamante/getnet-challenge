@@ -29,7 +29,9 @@ class DeepSeekJudgeModel(DeepEvalBaseLLM):
             model=self._model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            extra_body={"thinking": {"type": "disabled"}},  # disable thinking mode for faster judge calls
+            extra_body={
+                "thinking": {"type": "disabled"}
+            },  # disable thinking mode for faster judge calls
         )
         content = response.choices[0].message.content or ""
         return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()

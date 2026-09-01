@@ -1,5 +1,3 @@
-from typing import TypeAlias
-
 from pydantic import BaseModel, Field
 
 
@@ -12,4 +10,4 @@ class SearchResultModel(BaseModel):
     score: float | None = None  # relevance score when available
 
 
-SearchResult: TypeAlias = SearchResultModel
+type SearchResult = SearchResultModel

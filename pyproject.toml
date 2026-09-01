@@ -33,6 +33,7 @@ dev = [
     "fakeredis>=2.37.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
+    "ruff>=0.9",
 ]
 
 [tool.uv]
@@ -41,3 +42,21 @@ package = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["src/__tests__"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501", # line too long — handled by formatter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -1,5 +1,3 @@
-from typing import TypeAlias
-
 from src.domain.entities.User_Message import UserMessageModel
 
 
@@ -9,4 +7,4 @@ class ChatRequestModel(UserMessageModel):
     session_id: str | None = None
 
 
-ChatRequest: TypeAlias = ChatRequestModel
+type ChatRequest = ChatRequestModel

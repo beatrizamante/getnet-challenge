@@ -1,6 +1,5 @@
 import asyncio
 import importlib.metadata
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends

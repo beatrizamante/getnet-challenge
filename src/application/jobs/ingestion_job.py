@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -52,7 +52,7 @@ async def run_ingestion_pipeline(ctx: dict[str, Any], *, force: bool = False) ->
 
         metadata = {
             "page_title": page.title,
-            "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
+            "ingested_at": datetime.now(tz=UTC).isoformat(),
         }
         chunk_ids = await ingest_service.ingest(page.text, source=page.url, metadata=metadata)
         await redis_client.set(cache_key, "1", ex=_INGEST_TTL)

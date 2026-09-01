@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import TypeAlias
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -19,4 +18,5 @@ class TransactionModel(BaseModel):
             raise ValueError("settlement_date must not be before created_at")
         return self
 
-Transaction: TypeAlias = TransactionModel
+
+type Transaction = TransactionModel

@@ -6,8 +6,6 @@ from src.domain.ports.Vector_Store_Port import VectorStorePort
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_K = 4
-
 
 class RagRetrievalService:
     """Two-stage retrieval: ChromaDB similarity search → optional cross-encoder reranking."""
@@ -15,9 +13,9 @@ class RagRetrievalService:
     def __init__(
         self,
         vector_store: VectorStorePort,
-        default_k: int = _DEFAULT_K,
+        default_k: int = 4,
         reranker: RerankerPort | None = None,
-        top_n: int = _DEFAULT_K,
+        top_n: int = 4,
         rerank_factor: int = 4,
     ) -> None:
         self._vector_store = vector_store

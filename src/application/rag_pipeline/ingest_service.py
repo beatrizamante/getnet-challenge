@@ -8,9 +8,6 @@ from src.domain.ports.Vector_Store_Port import VectorStorePort
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CHUNK_SIZE = 500
-_DEFAULT_OVERLAP = 50
-
 
 class RagIngestService:
     """Splits raw text into semantically-aware overlapping chunks and upserts them to the vector store."""
@@ -18,8 +15,8 @@ class RagIngestService:
     def __init__(
         self,
         vector_store: VectorStorePort,
-        chunk_size: int = _DEFAULT_CHUNK_SIZE,
-        chunk_overlap: int = _DEFAULT_OVERLAP,
+        chunk_size: int = 512,
+        chunk_overlap: int = 64,
     ) -> None:
         self._vector_store = vector_store
         self._splitter = RecursiveCharacterTextSplitter(

@@ -8,7 +8,8 @@ from src.domain.ports.Vector_Store_Port import VectorStorePort
 
 logger = logging.getLogger(__name__)
 
-#NOTE - In more complex programs, for instance an roleplay agent, you'd need to chunk the query as well and make a batch similarity search
+
+# NOTE - In more complex programs, for instance an roleplay agent, you'd need to chunk the query as well and make a batch similarity search
 class ChromaAdapter(VectorStorePort):
     """VectorStorePort backed by ChromaDB using cosine similarity over HuggingFace embeddings."""
 
@@ -76,10 +77,12 @@ class ChromaAdapter(VectorStorePort):
         for chunk_id, doc, meta in zip(ids, docs, metas):
             meta_dict = dict(meta)
             source = str(meta_dict.pop("source", ""))
-            chunks.append(Chunk(
-                id=chunk_id,
-                content=doc,
-                source=source,
-                metadata={key: str(val) for key, val in meta_dict.items()},
-            ))
+            chunks.append(
+                Chunk(
+                    id=chunk_id,
+                    content=doc,
+                    source=source,
+                    metadata={key: str(val) for key, val in meta_dict.items()},
+                )
+            )
         return chunks

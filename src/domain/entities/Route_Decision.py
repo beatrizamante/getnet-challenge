@@ -1,4 +1,4 @@
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,4 +12,5 @@ class RouteDecisionModel(BaseModel):
     target_agent: str = Field(min_length=1)
     reasoning: str = Field(min_length=1)
 
-RouteDecision: TypeAlias = RouteDecisionModel
+
+type RouteDecision = RouteDecisionModel

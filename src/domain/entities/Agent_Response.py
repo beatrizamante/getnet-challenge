@@ -1,5 +1,3 @@
-from typing import TypeAlias
-
 from pydantic import BaseModel, Field, field_validator
 
 _MAX_ANSWER = 4000
@@ -31,4 +29,5 @@ class AgentResponseModel(BaseModel):
         safe_answer = (answer.strip() or "No answer provided.")[:_MAX_ANSWER]
         return cls(answer=safe_answer, source_agent=source_agent, sources=sources or [])
 
-AgentResponse: TypeAlias = AgentResponseModel
+
+type AgentResponse = AgentResponseModel

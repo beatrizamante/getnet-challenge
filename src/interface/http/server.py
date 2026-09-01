@@ -1,7 +1,9 @@
 import logging
+
 import uvicorn
 
 from src.infrastructure.config.settings import AppSettings
+
 
 def make_server() -> uvicorn.Server:
     logger = logging.getLogger(__name__)

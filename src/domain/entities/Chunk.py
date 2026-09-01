@@ -1,5 +1,3 @@
-from typing import TypeAlias
-
 from pydantic import BaseModel, Field
 
 
@@ -13,4 +11,4 @@ class ChunkModel(BaseModel):
     embedding: list[float] | None = None
 
 
-Chunk: TypeAlias = ChunkModel
+type Chunk = ChunkModel

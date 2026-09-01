@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 _INDEX_KEY = "semantic_cache:index"
 _PREFIX = "semantic_cache:"
-#TODO - For now, the caching is only used for KB retrieval, but for a full on app, we'd need to make an index key for chat history and another for the knowledge base
+# TODO - For now, the caching is only used for KB retrieval, but for a full on app, we'd need to make an index key for chat history and another for the knowledge base
+
 
 class RedisCacheAdapter(CachePort):
     """Semantic cache backed by Redis: hits are resolved by embedding cosine similarity, not exact key equality."""
@@ -50,7 +51,9 @@ class RedisCacheAdapter(CachePort):
                 value = stored.get(b"value") or stored.get("value")
                 if emb_bytes is None or value is None:
                     continue
-                raw_bytes = emb_bytes if isinstance(emb_bytes, bytes) else emb_bytes.encode("latin-1")
+                raw_bytes = (
+                    emb_bytes if isinstance(emb_bytes, bytes) else emb_bytes.encode("latin-1")
+                )
                 stored_vec = np.frombuffer(raw_bytes, dtype=np.float32)
                 score = _cosine_similarity(query_vec, stored_vec)
                 if score > best_score:
@@ -67,9 +70,7 @@ class RedisCacheAdapter(CachePort):
     async def set(self, key: str, value: str, ttl: int = 0) -> None:
         """Embed `key`, store the (embedding, value) pair with TTL, and register it in the index."""
         try:
-            emb_bytes = np.array(
-                await self._embedding.embed(key), dtype=np.float32
-            ).tobytes()
+            emb_bytes = np.array(await self._embedding.embed(key), dtype=np.float32).tobytes()
             entry_key = f"{_PREFIX}{_hash(key)}"
             await self._redis.hset(entry_key, mapping={"embedding": emb_bytes, "value": value})
             await self._redis.expire(entry_key, ttl or self._default_ttl)

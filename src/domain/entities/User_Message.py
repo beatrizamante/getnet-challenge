@@ -1,11 +1,8 @@
 from pydantic import BaseModel, Field
 
 
-class UserMessageModel(BaseModel):
+class UserMessage(BaseModel):
     """Incoming chat payload sent by the user."""
 
     message: str = Field(min_length=1, max_length=2000)
     user_id: str = Field(min_length=1, max_length=100)
-
-
-type UserMessage = UserMessageModel

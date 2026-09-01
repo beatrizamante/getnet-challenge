@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
 
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Agent_State import AgentState, Turn
@@ -74,7 +74,7 @@ class CustomerSupportAgent:
         answer = final.content if isinstance(final.content, str) else str(final.content)
         return {
             "context": "",
-            "response": AgentResponseModel.build(
+            "response": AgentResponse.build(
                 answer=answer,
                 source_agent="customer_support",
             ).model_dump(),

@@ -162,6 +162,20 @@ class AppSettings(BaseSettings):
     prompts_file: str = Field(default="")
 
 
+class JWTSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="JWT_", env_file=".env", extra="ignore")
+
+    secret: str = Field(default="dev-secret-change-in-production-minimum-32-chars!!", min_length=32)
+    algorithm: str = Field(default="HS256")
+    expiry_minutes: int = Field(default=60, gt=0)
+
+
+class AdminSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="ADMIN_", env_file=".env", extra="ignore")
+
+    secret: str = Field(default="")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -178,6 +192,8 @@ class Settings(BaseSettings):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     escalation: EscalationSettings = Field(default_factory=EscalationSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
+    jwt: JWTSettings = Field(default_factory=JWTSettings)
+    admin: AdminSettings = Field(default_factory=AdminSettings)
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":  # pylint: disable=no-member
@@ -191,6 +207,10 @@ class Settings(BaseSettings):
             errors.append("SEARCH_API_KEY is required in production")
         if not self.redis.password:
             errors.append("REDIS_PASSWORD is required in production")
+        if self.jwt.secret.startswith("dev-secret"):
+            errors.append("JWT_SECRET must be changed from the default in production")
+        if not self.admin.secret:
+            errors.append("ADMIN_SECRET is required in production")
         if errors:
             raise ValueError("\n".join(errors))
         return self

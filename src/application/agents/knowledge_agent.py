@@ -10,7 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
 
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
@@ -90,7 +90,7 @@ class KnowledgeAgent:
 
         return {
             "context": context,
-            "response": AgentResponseModel.build(
+            "response": AgentResponse.build(
                 answer=answer,
                 source_agent="knowledge",
                 sources=sources,

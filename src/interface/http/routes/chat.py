@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from src._lib.container import Container, get_container
 from src.application.agents.escalation_agent import EscalationAgent
@@ -9,16 +9,17 @@ from src.application.caching.conversation_history_service import ConversationHis
 from src.application.caching.semantic_cache_service import SemanticCacheService
 from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.entities.Chat_Request import ChatRequest
 from src.domain.shared.Agent_State import AgentState
+from src.interface.http.middleware.auth import TokenClaims, require_user
+from src.interface.http.middleware.rate_limit import limiter
 
 _CACHEABLE_AGENTS = {"knowledge", "off_topic", "general_search"}
 
 router = APIRouter(tags=["chat"])
 
 # NOTE - PYBREAKER future addition for production circuit-breaking
-# TODO - tool max attempts/repetitions
 # TODO - try/catch errors back to the model (if applicable)
 
 
@@ -48,50 +49,56 @@ def _history_service(
     return container.history_service()
 
 
-@router.post("/chat", response_model=AgentResponseModel)
+@router.post("/chat", response_model=AgentResponse)
+@limiter.limit("20/minute")
 async def chat(
+    _: Request,  # required by slowapi to resolve the rate-limit key
     body: ChatRequest,
     background: BackgroundTasks,
+    claims: TokenClaims = Depends(require_user),
     graph=Depends(_graph),
     escalation: EscalationAgent = Depends(_escalation),
     input_guard: InputGuardrail = Depends(_input_guard),
     output_guard: OutputGuardrail = Depends(_output_guard),
     cache: SemanticCacheService = Depends(_cache),
     history_service: ConversationHistoryService = Depends(_history_service),
-) -> AgentResponseModel:
+) -> AgentResponse:
     """Run the agent orchestration graph and return a structured response."""
-    guard_result = await input_guard.check(body.message)
+    user_id = claims.sub
+    message = body.message
+    session_id = body.session_id or str(uuid.uuid4())
+
+    guard_result = await input_guard.check(message)
     if guard_result.blocked:
-        return AgentResponseModel.build(
+        return AgentResponse.build(
             answer=guard_result.safe_response,
             source_agent="guardrail",
         )
 
-    cached_json = await cache.get(body.message)
+    cached_json = await cache.get(message)
     if cached_json:
-        return AgentResponseModel.model_validate_json(cached_json)
+        return AgentResponse.model_validate_json(cached_json)
 
-    history = await history_service.get(body.session_id or "")
+    history = await history_service.get(session_id)
 
     state: AgentState = {
-        "messages": [body.message],
+        "messages": [message],
         "history": history,
-        "user_id": body.user_id,
-        "session_id": body.session_id or str(uuid.uuid4()),
+        "user_id": user_id,
+        "session_id": session_id,
     }
     result = await graph.ainvoke(state)
     raw: dict = result.get("response") or {}
     answer = str(raw.get("answer") or "")
 
-    await history_service.append(state["session_id"], "user", body.message)
-    await history_service.append(state["session_id"], "assistant", answer)
+    await history_service.append_exchange(session_id, message, answer)
     source_agent = str(raw.get("source_agent") or "unknown")
     context: str = result.get("context") or ""
 
     if source_agent == "knowledge" and context:
         answer = await output_guard.apply(question=body.message, answer=answer, context=context)
 
-    response = AgentResponseModel.build(
+    response = AgentResponse.build(
         answer=answer,
         source_agent=source_agent,
         sources=raw.get("sources") or [],
@@ -103,7 +110,7 @@ async def chat(
     if source_agent == "escalate":
         background.add_task(
             escalation.log_escalation,
-            user_id=body.user_id,
+            user_id=user_id,
             message=body.message,
             reason="router classified as escalate",
         )

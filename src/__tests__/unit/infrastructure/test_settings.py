@@ -2,10 +2,12 @@ import pytest
 from pydantic import ValidationError
 
 from src.infrastructure.config.settings import (
+    AdminSettings,
     AppSettings,
     ConversationSettings,
     GuardrailSettings,
     IngestionSettings,
+    JWTSettings,
     LangfuseSettings,
     LLMSettings,
     RedisSettings,
@@ -74,6 +76,8 @@ def test_valid_production_settings_pass() -> None:
         llm=LLMSettings(api_key="sk-llm"),
         search=SearchSettings(api_key="sk-search"),
         redis=RedisSettings(password="secret"),
+        jwt=JWTSettings(secret="a-very-long-secret-that-is-not-the-default-one!"),
+        admin=AdminSettings(secret="admin-secret"),
     )
     # pylint: disable=no-member
     assert s.app.env == "production"

@@ -1,7 +1,7 @@
 import pytest
 
 from src.application.agents.graph import build_graph
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.shared.Agent_State import AgentState
 
 
@@ -20,7 +20,7 @@ class _MockAgent:
     async def run(self, _: AgentState) -> dict:
         return {
             "context": "",
-            "response": AgentResponseModel.build(
+            "response": AgentResponse.build(
                 answer=f"Resposta do agente {self._source}.", source_agent=self._source
             ).model_dump(),
         }

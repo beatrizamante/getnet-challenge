@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 _MAX_ANSWER = 4000
 
 
-class AgentResponseModel(BaseModel):
+class AgentResponse(BaseModel):
     """Structured output returned by a specialized agent."""
 
     answer: str = Field(min_length=1, max_length=_MAX_ANSWER)
@@ -24,10 +24,7 @@ class AgentResponseModel(BaseModel):
         answer: str,
         source_agent: str,
         sources: list[str] | None = None,
-    ) -> "AgentResponseModel":
+    ) -> "AgentResponse":
         """Safe constructor: truncates answer and applies a fallback for empty responses."""
         safe_answer = (answer.strip() or "No answer provided.")[:_MAX_ANSWER]
         return cls(answer=safe_answer, source_agent=source_agent, sources=sources or [])
-
-
-type AgentResponse = AgentResponseModel

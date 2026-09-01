@@ -20,8 +20,10 @@ dependencies = [
     "langgraph>=1.2.10",
     "openai>=2.53.0",
     "pydantic>=2.13.4",
+    "PyJWT>=2.9",
     "redis>=8.1.0",
     "sentence-transformers>=5.7.0",
+    "slowapi>=0.1.10",
     "tavily-python>=0.7.27",
 ]
 
@@ -54,7 +56,8 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = [
-    "E501", # line too long — handled by formatter
+    "E501",  # line too long — handled by formatter
+    "UP040", # type X = Y creates TypeAliasType (not callable); aliases used as constructors
 ]
 
 [tool.ruff.format]

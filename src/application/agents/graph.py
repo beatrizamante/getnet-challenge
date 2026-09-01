@@ -7,23 +7,23 @@ from src.application.agents.customer_support_agent import CustomerSupportAgent
 from src.application.agents.escalation_agent import EscalationAgent
 from src.application.agents.knowledge_agent import KnowledgeAgent
 from src.application.agents.router_agent import RouterAgent
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.observability.tracing import traced_node
 
 
 async def _formatter_node(state: AgentState) -> dict:
-    """Validates and normalises the agent response through AgentResponseModel before the graph exits."""
+    """Validates and normalises the agent response through AgentResponse before the graph exits."""
     raw: dict = state.get("response") or {}
     try:
-        validated = AgentResponseModel(
+        validated = AgentResponse(
             answer=str(raw.get("answer") or "No answer provided."),
             source_agent=str(raw.get("source_agent") or "unknown"),
             sources=raw.get("sources") or [],
         )
     except Exception:  # pylint: disable=broad-except
-        validated = AgentResponseModel(
+        validated = AgentResponse(
             answer="An error occurred while processing your request.",
             source_agent="unknown",
             sources=[],

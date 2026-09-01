@@ -1,10 +1,7 @@
-from src.domain.entities.User_Message import UserMessageModel
+from src.domain.entities.User_Message import UserMessage
 
 
-class ChatRequestModel(UserMessageModel):
+class ChatRequest(UserMessage):
     """Extends UserMessage (user_id, message) with optional session tracking."""
 
     session_id: str | None = None
-
-
-type ChatRequest = ChatRequestModel

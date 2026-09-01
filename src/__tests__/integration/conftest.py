@@ -7,7 +7,10 @@ from fastapi import FastAPI
 
 from src._lib.container import get_container
 from src.application.guardrails.input_guardrail import InputGuardrailResult
+from src.interface.http.middleware.auth import TokenClaims, require_user
 from src.interface.http.routes.chat import router as chat_router
+
+_DEFAULT_CLAIMS = TokenClaims(sub="u1", role="user")
 
 
 def _make_mock_container(
@@ -49,11 +52,12 @@ def _make_mock_container(
     return container
 
 
-def make_test_app(container: MagicMock) -> FastAPI:
-    """Minimal FastAPI app with only the chat router — no lifespan, no infra connections."""
+def make_test_app(container: MagicMock, claims: TokenClaims = _DEFAULT_CLAIMS) -> FastAPI:
+    """Minimal FastAPI app — no lifespan, auth stubbed out to the given claims."""
     app = FastAPI()
     app.include_router(chat_router)
     app.dependency_overrides[get_container] = lambda: container
+    app.dependency_overrides[require_user] = lambda: claims
     return app
 
 

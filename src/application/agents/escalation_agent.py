@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
 
-from src.domain.entities.Agent_Response import AgentResponseModel
+from src.domain.entities.Agent_Response import AgentResponse
 from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
@@ -32,7 +32,7 @@ class EscalationAgent:
 
     async def run(self, _: AgentState) -> dict:
         return {
-            "response": AgentResponseModel.build(
+            "response": AgentResponse.build(
                 answer=self._handoff_answer,
                 source_agent="escalate",
             ).model_dump()

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 
-class ChunkModel(BaseModel):
+class Chunk(BaseModel):
     """Document fragment stored and retrieved from the vector store."""
 
     id: str = Field(min_length=1)
@@ -9,6 +9,3 @@ class ChunkModel(BaseModel):
     source: str = Field(min_length=1)  # origin document or URL
     metadata: dict[str, str] = {}
     embedding: list[float] | None = None
-
-
-type Chunk = ChunkModel

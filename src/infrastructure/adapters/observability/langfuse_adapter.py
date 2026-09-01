@@ -1,8 +1,8 @@
 import logging
-from langfuse.langchain import CallbackHandler
 from typing import Any
 
 from langfuse import Langfuse  # noqa: F401 — imported so tests can patch it
+from langfuse.langchain import CallbackHandler
 from langfuse.types import TraceContext
 
 from src.infrastructure.config.settings import LangfuseSettings
@@ -33,21 +33,33 @@ class LangfuseAdapter:
             return ""
         try:
             client: Any = self._client
-            safe = {k: (v[:500] + "\u2026" if isinstance(v, str) and len(v) > 500 else v) for k, v in payload.items()}
+            safe = {
+                k: (v[:500] + "\u2026" if isinstance(v, str) and len(v) > 500 else v)
+                for k, v in payload.items()
+            }
             trace_id: str = client.create_trace_id()
-            client.start_observation(name=name, input=safe, trace_context=TraceContext(trace_id=trace_id))
+            client.start_observation(
+                name=name, input=safe, trace_context=TraceContext(trace_id=trace_id)
+            )
             return trace_id
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Langfuse trace failed. error=%s", exc)
             return ""
 
-    def span(self, trace_id: str, name: str, input_data: dict[str, Any], output: dict[str, Any]) -> None:
+    def span(
+        self, trace_id: str, name: str, input_data: dict[str, Any], output: dict[str, Any]
+    ) -> None:
         """Record a child span on an existing trace."""
         if not self._enabled or self._client is None or not trace_id:
             return
         try:
             client: Any = self._client
-            client.start_observation(name=name, input=input_data, output=output, trace_context=TraceContext(trace_id=trace_id))
+            client.start_observation(
+                name=name,
+                input=input_data,
+                output=output,
+                trace_context=TraceContext(trace_id=trace_id),
+            )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Langfuse span failed. error=%s", exc)
 
@@ -61,7 +73,9 @@ class LangfuseAdapter:
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Langfuse score failed. error=%s", exc)
 
-    def get_callback_handler(self, user_id: str = "", session_id: str = "", trace_name: str = "") -> Any:
+    def get_callback_handler(
+        self, user_id: str = "", session_id: str = "", trace_name: str = ""
+    ) -> Any:
         """Return a LangChain CallbackHandler that automatically traces LLM+tool calls as child spans."""
         if not self._enabled or self._client is None:
             return None

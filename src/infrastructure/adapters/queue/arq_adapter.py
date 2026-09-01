@@ -36,7 +36,9 @@ class ArqQueueAdapter(QueuePort):
             logger.debug("Job enqueued. job=%s id=%s", job_name, job.job_id if job else None)
             return job.job_id if job else None
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("ARQ enqueue skipped (Redis unavailable). job=%s error=%s", job_name, exc)
+            logger.warning(
+                "ARQ enqueue skipped (Redis unavailable). job=%s error=%s", job_name, exc
+            )
             self._pool = None  # reset so the next call retries the connection
             return None
 
@@ -47,5 +49,7 @@ class ArqQueueAdapter(QueuePort):
             await pool.enqueue_job(job_name, _defer_until=run_at, **kwargs)
             logger.debug("Job scheduled. job=%s run_at=%s", job_name, run_at)
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("ARQ enqueue_at skipped (Redis unavailable). job=%s error=%s", job_name, exc)
+            logger.warning(
+                "ARQ enqueue_at skipped (Redis unavailable). job=%s error=%s", job_name, exc
+            )
             self._pool = None

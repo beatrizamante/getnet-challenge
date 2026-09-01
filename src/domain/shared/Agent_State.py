@@ -1,8 +1,10 @@
 from typing import Literal, NotRequired, TypedDict
 
+
 class Turn(TypedDict):
     role: Literal["user", "assistant"]
     content: str
+
 
 class AgentState(TypedDict):
     messages: list[str]

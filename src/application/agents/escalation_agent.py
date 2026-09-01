@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
 
@@ -11,6 +11,7 @@ from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseA
 logger = logging.getLogger(__name__)
 
 _ESCALATION_KEY = "escalations:{user_id}"
+
 
 class EscalationAgent:
     """Returns an immediate handoff response; async logging runs separately as a BackgroundTask."""
@@ -30,10 +31,12 @@ class EscalationAgent:
         self._max_entries = max_entries
 
     async def run(self, _: AgentState) -> dict:
-        return {"response": AgentResponseModel.build(
-            answer=self._handoff_answer,
-            source_agent="escalate",
-        ).model_dump()}
+        return {
+            "response": AgentResponseModel.build(
+                answer=self._handoff_answer,
+                source_agent="escalate",
+            ).model_dump()
+        }
 
     async def log_escalation(self, user_id: str, message: str, reason: str = "") -> None:
         """Fire-and-forget: log escalation event to Langfuse + Redis audit list."""
@@ -41,12 +44,14 @@ class EscalationAgent:
             "escalation",
             {"user_id": user_id, "message": message, "reason": reason},
         )
-        event = json.dumps({
-            "user_id": user_id,
-            "message": message,
-            "reason": reason,
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-        })
+        event = json.dumps(
+            {
+                "user_id": user_id,
+                "message": message,
+                "reason": reason,
+                "timestamp": datetime.now(tz=UTC).isoformat(),
+            }
+        )
         key = _ESCALATION_KEY.format(user_id=user_id)
         await self._redis.lpush(key, event)
         await self._redis.ltrim(key, 0, self._max_entries - 1)

@@ -1,21 +1,22 @@
 import logging
 from typing import Any
 
+from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
-from langchain.agents import create_agent
 
 from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
-from src.domain.shared.Application_Errors import UserNotFoundError
 from src.domain.shared.Agent_State import AgentState, Turn
+from src.domain.shared.Application_Errors import UserNotFoundError
 from src.domain.shared.constants import REACT_MAX_ITERATIONS
-from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
+from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 
 logger = logging.getLogger(__name__)
+
 
 class CustomerSupportAgent:
     """ReAct agent with 3 tools: profile lookup, transaction history, settlement estimate."""

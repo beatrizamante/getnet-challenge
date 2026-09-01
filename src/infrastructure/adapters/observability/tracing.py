@@ -8,6 +8,7 @@ from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseA
 
 def traced_node(langfuse: LangfuseAdapter, node_name: str) -> Callable:
     """Wraps a LangGraph node function with a Langfuse trace+span, propagating user_id/session_id."""
+
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)
         async def wrapper(state: dict[str, Any]) -> dict[str, Any]:
@@ -31,11 +32,13 @@ def traced_node(langfuse: LangfuseAdapter, node_name: str) -> Callable:
                 return result
             except Exception as exc:
                 langfuse.span(
-                    trace_id, f"node.{node_name}",
+                    trace_id,
+                    f"node.{node_name}",
                     input_data={"user_id": user_id},
                     output={"error": str(exc)},
                 )
                 raise
 
         return wrapper
+
     return decorator

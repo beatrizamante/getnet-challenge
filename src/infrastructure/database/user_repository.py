@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from src.domain.entities.Transaction import Transaction
 from src.domain.entities.User_Profile import UserProfile
@@ -20,7 +20,5 @@ class InMemoryUserRepository(UserRepositoryPort):
         return self._profiles.get(user_id)
 
     async def get_transactions(self, user_id: str, days: int) -> list[Transaction]:
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
-        return [
-            t for t in self._transactions.get(user_id, []) if t.created_at >= cutoff
-        ]
+        cutoff = datetime.now(tz=UTC) - timedelta(days=days)
+        return [t for t in self._transactions.get(user_id, []) if t.created_at >= cutoff]

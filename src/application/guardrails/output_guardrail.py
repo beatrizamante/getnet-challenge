@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from deepeval.metrics import FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 
+from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR
 from src.infrastructure.adapters.llm.deepseek_judge import DeepSeekJudgeModel
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
-from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +75,10 @@ class OutputGuardrail:
             logger.info("Output guardrail: score=%.2f passed=%s reason=%s", score, passed, reason)
             return OutputGuardrailResult(passed=passed, score=score, reason=reason)
 
-        except asyncio.TimeoutError:
-            logger.warning("Output guardrail timed out after %.1fs — passing through.", self._judge_timeout)
+        except TimeoutError:
+            logger.warning(
+                "Output guardrail timed out after %.1fs — passing through.", self._judge_timeout
+            )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Output guardrail failed — passing through. error=%s", exc)
 

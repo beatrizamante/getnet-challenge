@@ -1,13 +1,13 @@
 import json
-import re
 import logging
+import re
 from contextvars import ContextVar
 from typing import Any
 
+from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool as lc_tool
-from langchain.agents import create_agent
 
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
 from src.domain.entities.Agent_Response import AgentResponseModel
@@ -16,12 +16,13 @@ from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
 from src.domain.shared.Agent_State import AgentState, Turn
 from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR, REACT_MAX_ITERATIONS
-from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
+from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 
 logger = logging.getLogger(__name__)
 
 _retrieved_ctx: ContextVar[list[str]] = ContextVar("retrieved_context")
+
 
 class KnowledgeAgent:
     """LangGraph ReAct agent — graph compiled once; per-request context via ContextVar."""
@@ -123,7 +124,9 @@ def _make_retrieve_tool(
 
         context = CONTEXT_CHUNK_SEPARATOR.join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
         sources = list(dict.fromkeys(c.source for c in chunks))
-        await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), kb_cache_ttl)
+        await cache.set(
+            cache_key, json.dumps({"context": context, "sources": sources}), kb_cache_ttl
+        )
         _retrieved_ctx.get().append(context)
         return context
 

@@ -1,7 +1,7 @@
-
-from typing import Any
-import chromadb
 import logging
+from typing import Any
+
+import chromadb
 import redis.asyncio as aioredis
 from dependency_injector import containers, providers
 
@@ -16,21 +16,21 @@ from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail
 from src.application.rag_pipeline.ingest_service import RagIngestService
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
-from src.domain.ports.Reranker_Port import RerankerPort
 from src.config.logger import setup_logging
+from src.domain.ports.Reranker_Port import RerankerPort
 from src.infrastructure.adapters.cache.redis_cache_adapter import RedisCacheAdapter
 from src.infrastructure.adapters.embeddings.huggingface_adapter import HuggingFaceEmbeddingAdapter
-from src.infrastructure.adapters.reranker.cross_encoder_reranker import CrossEncoderReranker
-from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
 from src.infrastructure.adapters.llm.deepseek_judge import DeepSeekJudgeModel
+from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.queue.arq_adapter import ArqQueueAdapter
+from src.infrastructure.adapters.reranker.cross_encoder_reranker import CrossEncoderReranker
+from src.infrastructure.adapters.scraper.getnet_scraper import GetnetScraper
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
 from src.infrastructure.adapters.user_repository.mock_user_repository import MockUserRepository
 from src.infrastructure.adapters.vector_store.chroma_adapter import ChromaAdapter
-from src.infrastructure.config.settings import Settings, get_settings
 from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
-from src.infrastructure.adapters.scraper.getnet_scraper import GetnetScraper
+from src.infrastructure.config.settings import Settings, get_settings
 
 
 def _make_langfuse(settings: Settings) -> LangfuseAdapter:
@@ -60,6 +60,7 @@ def _make_queue(settings: Settings) -> ArqQueueAdapter:
 def _make_redis_client(settings: Settings) -> aioredis.Redis:
     return aioredis.Redis.from_url(settings.redis.url)
 
+
 def _make_cache(
     settings: Settings,
     redis_client: aioredis.Redis,
@@ -80,7 +81,9 @@ async def _chroma_client_resource(settings: Settings):
         client = await chromadb.AsyncHttpClient(
             host=settings.chroma.host, port=settings.chroma.port
         )
-        _logger.info("ChromaDB connected. host=%s port=%d", settings.chroma.host, settings.chroma.port)
+        _logger.info(
+            "ChromaDB connected. host=%s port=%d", settings.chroma.host, settings.chroma.port
+        )
     except Exception as exc:  # pylint: disable=broad-except
         _logger.warning("ChromaDB unavailable at startup — vector store disabled. error=%s", exc)
         client = None
@@ -106,7 +109,10 @@ def _make_ingest_service(settings: Settings, vector_store: ChromaAdapter) -> Rag
         chunk_overlap=settings.ingestion.chunk_overlap,
     )
 
-def _make_conversation_history(settings: Settings, cache: RedisCacheAdapter) -> ConversationHistoryService:
+
+def _make_conversation_history(
+    settings: Settings, cache: RedisCacheAdapter
+) -> ConversationHistoryService:
     return ConversationHistoryService(
         cache=cache,
         session_ttl=settings.conversation.session_ttl,
@@ -252,7 +258,7 @@ class Container(containers.DeclarativeContainer):
         embedding=embedding_port,
     )
 
-    conversation_history = providers.Singleton(
+    history_service = providers.Singleton(
         _make_conversation_history, settings=settings, cache=cache_port
     )
 
@@ -298,7 +304,10 @@ class Container(containers.DeclarativeContainer):
         prompts=prompt_catalog,
     )
     escalation_agent = providers.Singleton(
-        _make_escalation_agent, settings=settings, langfuse=langfuse_adapter, redis_client=redis_client
+        _make_escalation_agent,
+        settings=settings,
+        langfuse=langfuse_adapter,
+        redis_client=redis_client,
     )
     input_guardrail = providers.Singleton(
         _make_input_guardrail,

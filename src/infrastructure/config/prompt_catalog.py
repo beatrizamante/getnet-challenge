@@ -1,12 +1,13 @@
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 from src.domain.shared.Prompt_Catalog import PromptCatalog
 
 _DEFAULT_PROMPTS_PATH = Path(__file__).with_name("prompts.json")
 
-@lru_cache(maxsize=None)
+
+@cache
 def load_prompt_catalog(prompts_file: str = "") -> PromptCatalog:
     path = Path(prompts_file) if prompts_file else _DEFAULT_PROMPTS_PATH
     try:

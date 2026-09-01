@@ -44,9 +44,7 @@ async def get_latest_eval(container: Container = Depends(get_container)) -> dict
 
 
 @router.get("/escalations/{user_id}")
-async def get_escalations(
-    user_id: str, escalation: EscalationAgent = Depends(_escalation)
-) -> dict:
+async def get_escalations(user_id: str, escalation: EscalationAgent = Depends(_escalation)) -> dict:
     """Return the escalation audit log for a user (most recent first)."""
     events = await escalation.get_audit_log(user_id)
     return {"user_id": user_id, "count": len(events), "events": events}

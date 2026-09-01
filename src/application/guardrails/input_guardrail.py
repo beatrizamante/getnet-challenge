@@ -55,7 +55,9 @@ class InputGuardrail:
         for pattern in _INJECTION_PATTERNS:
             if pattern.search(message):
                 logger.warning("Input blocked by rule. pattern=%s", pattern.pattern)
-                return InputGuardrailResult(blocked=True, reason="prompt_injection", safe_response=self._safe_rejection)
+                return InputGuardrailResult(
+                    blocked=True, reason="prompt_injection", safe_response=self._safe_rejection
+                )
 
         try:
             decision = await self._llm.complete_structured(
@@ -64,7 +66,9 @@ class InputGuardrail:
             )
             if not decision.safe:
                 logger.warning("Input blocked by LLM classifier. reason=%s", decision.reason)
-                return InputGuardrailResult(blocked=True, reason=decision.reason, safe_response=self._safe_rejection)
+                return InputGuardrailResult(
+                    blocked=True, reason=decision.reason, safe_response=self._safe_rejection
+                )
         except Exception:
             try:
                 raw = await self._llm.complete(
@@ -73,7 +77,9 @@ class InputGuardrail:
                 )
                 if "unsafe" in raw.lower():
                     logger.warning("Input blocked by fallback LLM check.")
-                    return InputGuardrailResult(blocked=True, reason="llm_fallback", safe_response=self._safe_rejection)
+                    return InputGuardrailResult(
+                        blocked=True, reason="llm_fallback", safe_response=self._safe_rejection
+                    )
             except Exception as exc2:
                 logger.warning("Input guardrail fully failed, passing through. error=%s", exc2)
 

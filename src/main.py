@@ -2,16 +2,15 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from src._lib.container import get_container
-from src.interface.http.server import make_server
 from src.domain.shared.Application_Errors import BaseError, NotFoundError
 from src.interface.http.routes.admin import router as admin_router
 from src.interface.http.routes.chat import router as chat_router
 from src.interface.http.routes.health import router as health_router
+from src.interface.http.server import make_server
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,10 @@ async def _domain_error_handler(_: Request, exc: BaseError) -> JSONResponse:
 @app.exception_handler(Exception)
 async def _unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception: %s", exc)
-    return JSONResponse(status_code=500, content={"error": "INTERNAL_ERROR", "detail": "An unexpected error occurred."})
+    return JSONResponse(
+        status_code=500,
+        content={"error": "INTERNAL_ERROR", "detail": "An unexpected error occurred."},
+    )
 
 
 def main() -> None:

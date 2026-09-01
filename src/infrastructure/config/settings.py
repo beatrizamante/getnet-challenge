@@ -14,12 +14,14 @@ class LLMSettings(BaseSettings):
     max_retries: int = Field(default=3, ge=0)
     base_delay: float = Field(default=1.0, gt=0)
 
+
 class ChromaDBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CHROMA_", env_file=".env", extra="ignore")
 
     host: str = Field(default="localhost")
     port: int = Field(default=8000, ge=1, le=65535)
     collection_name: str = Field(default="getnet-docs")
+
 
 class RedisSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="REDIS_", env_file=".env", extra="ignore")
@@ -176,7 +178,6 @@ class Settings(BaseSettings):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     escalation: EscalationSettings = Field(default_factory=EscalationSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
-
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":  # pylint: disable=no-member

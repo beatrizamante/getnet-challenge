@@ -1,17 +1,18 @@
 """One-shot ingestion: scrapes Getnet pages and populates ChromaDB. Run via docker compose run --rm ingest."""
+
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
 from src._lib.container import get_container
-
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
 
 async def main() -> None:
 
@@ -32,7 +33,7 @@ async def main() -> None:
                 source=page.url,
                 metadata={
                     "page_title": page.title,
-                    "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
+                    "ingested_at": datetime.now(tz=UTC).isoformat(),
                 },
             )
             total_chunks += len(chunk_ids)

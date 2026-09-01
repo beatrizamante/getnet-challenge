@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import TypeAlias
 
 from pydantic import BaseModel, Field
 
@@ -12,4 +11,5 @@ class UserProfileModel(BaseModel):
     status: str = Field(min_length=1)
     joined_at: datetime
 
-UserProfile: TypeAlias = UserProfileModel
+
+type UserProfile = UserProfileModel

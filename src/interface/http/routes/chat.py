@@ -17,26 +17,34 @@ _CACHEABLE_AGENTS = {"knowledge", "off_topic", "general_search"}
 
 router = APIRouter(tags=["chat"])
 
-#NOTE - PYBREAKER future addition for production circuit-breaking
-#TODO - tool max attempts/repetitions
-#TODO - try/catch errors back to the model (if applicable)
+# NOTE - PYBREAKER future addition for production circuit-breaking
+# TODO - tool max attempts/repetitions
+# TODO - try/catch errors back to the model (if applicable)
+
 
 async def _graph(container: Annotated[Container, Depends(get_container)]):
     return await container.agent_graph.async_()
 
+
 async def _escalation(container: Annotated[Container, Depends(get_container)]) -> EscalationAgent:
     return container.escalation_agent()
+
 
 def _input_guard(container: Annotated[Container, Depends(get_container)]) -> InputGuardrail:
     return container.input_guardrail()
 
+
 def _output_guard(container: Annotated[Container, Depends(get_container)]) -> OutputGuardrail:
     return container.output_guardrail()
+
 
 def _cache(container: Annotated[Container, Depends(get_container)]) -> SemanticCacheService:
     return container.semantic_cache_service()
 
-def _history_service(container: Annotated[Container, Depends(get_container)]) -> ConversationHistoryService:
+
+def _history_service(
+    container: Annotated[Container, Depends(get_container)],
+) -> ConversationHistoryService:
     return container.history_service()
 
 
@@ -49,7 +57,7 @@ async def chat(
     input_guard: InputGuardrail = Depends(_input_guard),
     output_guard: OutputGuardrail = Depends(_output_guard),
     cache: SemanticCacheService = Depends(_cache),
-    history_service: ConversationHistoryService = Depends(_history_service)
+    history_service: ConversationHistoryService = Depends(_history_service),
 ) -> AgentResponseModel:
     """Run the agent orchestration graph and return a structured response."""
     guard_result = await input_guard.check(body.message)
@@ -81,9 +89,7 @@ async def chat(
     context: str = result.get("context") or ""
 
     if source_agent == "knowledge" and context:
-        answer = await output_guard.apply(
-            question=body.message, answer=answer, context=context
-        )
+        answer = await output_guard.apply(question=body.message, answer=answer, context=context)
 
     response = AgentResponseModel.build(
         answer=answer,

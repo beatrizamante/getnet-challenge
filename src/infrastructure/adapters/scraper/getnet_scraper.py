@@ -13,22 +13,20 @@ class ScrapedPage(NamedTuple):
     url: str
     title: str
 
+
 _SEED_URLS: list[str] = [
     "https://www.getnet.net/en",
     "https://www.getnet.net/en/corporate/about-us",
     "https://www.getnet.net/en/contact",
-
     "https://www.getnet.net/en/our-solutions/in-person-payments",
     "https://www.getnet.net/en/our-solutions/online-payments",
     "https://www.getnet.net/en/our-solutions/omnichannel",
     "https://www.getnet.net/en/our-solutions/value-added-solutions",
     "https://www.getnet.net/en/our-solutions/agentic-commerce",
-
     "https://www.getnet.net/en/your-business/industries/restaurants",
     "https://www.getnet.net/en/your-business/industries/health-and-beauty",
     "https://www.getnet.net/en/your-business/industries/travel",
     "https://www.getnet.net/en/your-business/large-enterprises",
-
     "https://www.getnet.net/en/partners",
     "https://www.getnet.net/en/resources/client-stories",
     "https://www.getnet.net/pt/",

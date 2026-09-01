@@ -55,13 +55,16 @@ def build_graph(
     graph: StateGraph = StateGraph(AgentState)
 
     async def _off_topic_node(_: AgentState) -> dict:
-        return {"response": {"answer": off_topic_answer, "source_agent": "off_topic", "sources": []}}
-    #NOTE - While we are adding a string object with a 'conversation memory' between agents here, it was done for simplicity sake, but there are better and more economic methods of doing it so.
-    #NOTE - A summarizer is one of them. A small model running on the local server just to summarize the conversation.
-    #NOTE - Another way is by summarizing the nth State into one paragraph (trim), while keeping the rest
-    #NOTE - Using RAG for long chat contexts
-    #NOTE - Different models for different agents (reasoning for router and knowledge, a mini model for customer support
-    #NOTE - Semantic compressing for tokens is another one
+        return {
+            "response": {"answer": off_topic_answer, "source_agent": "off_topic", "sources": []}
+        }
+
+    # NOTE - While we are adding a string object with a 'conversation memory' between agents here, it was done for simplicity sake, but there are better and more economic methods of doing it so.
+    # NOTE - A summarizer is one of them. A small model running on the local server just to summarize the conversation.
+    # NOTE - Another way is by summarizing the nth State into one paragraph (trim), while keeping the rest
+    # NOTE - Using RAG for long chat contexts
+    # NOTE - Different models for different agents (reasoning for router and knowledge, a mini model for customer support
+    # NOTE - Semantic compressing for tokens is another one
 
     def _wrap(name: str, fn: Any) -> Any:
         return traced_node(langfuse, name)(fn) if langfuse else fn
@@ -92,5 +95,6 @@ def build_graph(
 
     return graph.compile()
 
-#NOTE - For a bigger system, you could manage the memory to avoid exorbitant token costs and more compact states that fi context windows better, avoiding the Lost in the Middle effect
-#NOTE - Fot this app specifically, there's no reason to use long term memory since it's basically a Q&A bot, but for more complex agents, long term memory is advisable
+
+# NOTE - For a bigger system, you could manage the memory to avoid exorbitant token costs and more compact states that fi context windows better, avoiding the Lost in the Middle effect
+# NOTE - Fot this app specifically, there's no reason to use long term memory since it's basically a Q&A bot, but for more complex agents, long term memory is advisable

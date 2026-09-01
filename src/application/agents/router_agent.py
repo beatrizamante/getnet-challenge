@@ -1,11 +1,12 @@
 import logging
 
-from src.domain.shared.Agent_State import AgentState
 from src.domain.entities.Route_Decision import RouteDecisionModel
 from src.domain.ports.LLM_Port import LLMPort
+from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 
 logger = logging.getLogger(__name__)
+
 
 class RouterAgent:
     """Pure classifier: reads a message and returns a routing decision. Never calls other agents."""

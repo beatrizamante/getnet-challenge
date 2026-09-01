@@ -75,4 +75,5 @@ def test_valid_production_settings_pass() -> None:
         search=SearchSettings(api_key="sk-search"),
         redis=RedisSettings(password="secret"),
     )
+    # pylint: disable=no-member
     assert s.app.env == "production"

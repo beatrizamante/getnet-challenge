@@ -17,6 +17,7 @@ def vector_store():
 
 # --- IngestService ---
 
+
 class TestRagIngestService:
     async def test_splits_text_and_upserts(self, vector_store):
         service = RagIngestService(vector_store=vector_store, chunk_size=20, chunk_overlap=5)
@@ -43,6 +44,7 @@ class TestRagIngestService:
 
 
 # --- RetrievalService ---
+
 
 class TestRagRetrievalService:
     async def test_retrieve_returns_formatted_context(self, vector_store):

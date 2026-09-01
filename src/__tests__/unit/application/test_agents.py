@@ -1,28 +1,32 @@
 # pylint: disable=redefined-outer-name
-from langchain_core.messages import AIMessage, ToolMessage
-from unittest.mock import AsyncMock
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
+from langchain_core.messages import AIMessage, ToolMessage
 
-from src.application.agents.router_agent import RouterAgent
-from src.application.agents.knowledge_agent import KnowledgeAgent, _make_retrieve_tool, _retrieved_ctx
 from src.application.agents.customer_support_agent import (
     CustomerSupportAgent,
     _make_get_profile_tool,
     _make_get_settlement_tool,
     _make_get_transactions_tool,
 )
+from src.application.agents.knowledge_agent import (
+    KnowledgeAgent,
+    _make_retrieve_tool,
+    _retrieved_ctx,
+)
+from src.application.agents.router_agent import RouterAgent
 from src.application.rag_pipeline.retrieval_service import RagRetrievalService
-from src.domain.entities.User_Profile import UserProfile
 from src.domain.entities.Chunk import Chunk
 from src.domain.entities.Route_Decision import RouteDecisionModel
+from src.domain.entities.Transaction import Transaction
+from src.domain.entities.User_Profile import UserProfile
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
-from src.domain.entities.Transaction import Transaction
 from src.domain.ports.Search_Port import SearchPort
-from src.domain.shared.Application_Errors import UserNotFoundError
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
+from src.domain.shared.Application_Errors import UserNotFoundError
 
 
 def _decision(intent, target_agent):
@@ -35,13 +39,17 @@ class TestRouterAgent:
     async def test_routes_knowledge_intent(self):
         llm = AsyncMock(spec=LLMPort)
         llm.complete_structured.return_value = _decision("knowledge", "knowledge")
-        result = await RouterAgent(llm=llm).run({"messages": ["What is Get Smart?"], "user_id": "u1"})
+        result = await RouterAgent(llm=llm).run(
+            {"messages": ["What is Get Smart?"], "user_id": "u1"}
+        )
         assert result == {"route": "knowledge"}
 
     async def test_routes_customer_support_intent(self):
         llm = AsyncMock(spec=LLMPort)
         llm.complete_structured.return_value = _decision("customer_support", "customer_support")
-        result = await RouterAgent(llm=llm).run({"messages": ["My deposit is late"], "user_id": "u1"})
+        result = await RouterAgent(llm=llm).run(
+            {"messages": ["My deposit is late"], "user_id": "u1"}
+        )
         assert result == {"route": "customer_support"}
 
     async def test_routes_general_search_intent(self):
@@ -79,70 +87,70 @@ class TestRouterAgent:
     async def test_scenario_get_classica_vs_smart(self):
         route = await self._route(
             "What's the difference between the Get Clássica and the Get Smart?",
-            "knowledge", "knowledge"
+            "knowledge",
+            "knowledge",
         )
         assert route == "knowledge"
 
     async def test_scenario_weather(self):
         route = await self._route(
-            "What's the weather forecast in Porto Alegre tomorrow?",
-            "off_topic", "off_topic"
+            "What's the weather forecast in Porto Alegre tomorrow?", "off_topic", "off_topic"
         )
         assert route == "off_topic"
 
     async def test_scenario_deposit_timing(self):
         route = await self._route(
             "When will the money from yesterday's sales be deposited?",
-            "customer_support", "customer_support"
+            "customer_support",
+            "customer_support",
         )
         assert route == "customer_support"
 
     async def test_scenario_pix_bank_account(self):
         route = await self._route(
-            "Do I need a bank account to receive my sales via Pix?",
-            "knowledge", "knowledge"
+            "Do I need a bank account to receive my sales via Pix?", "knowledge", "knowledge"
         )
         assert route == "knowledge"
 
     async def test_scenario_machine_no_internet(self):
         route = await self._route(
             "My card machine won't connect to the internet, what should I do?",
-            "customer_support", "customer_support"
+            "customer_support",
+            "customer_support",
         )
         assert route == "customer_support"
 
     async def test_scenario_antecipacao(self):
         route = await self._route(
-            "How does receivables advance (antecipação) work with Getnet?",
-            "knowledge", "knowledge"
+            "How does receivables advance (antecipação) work with Getnet?", "knowledge", "knowledge"
         )
         assert route == "knowledge"
 
     async def test_scenario_euro_rate(self):
         route = await self._route(
-            "What's the euro exchange rate today?",
-            "general_search", "general_search"
+            "What's the euro exchange rate today?", "general_search", "general_search"
         )
         assert route == "general_search"
 
     async def test_scenario_decline_error(self):
         route = await self._route(
             "My card machine is showing a transaction decline error.",
-            "customer_support", "customer_support"
+            "customer_support",
+            "customer_support",
         )
         assert route == "customer_support"
 
     async def test_scenario_crediario_installments(self):
         route = await self._route(
             "How many installments can I split a sale into with the crediário?",
-            "knowledge", "knowledge"
+            "knowledge",
+            "knowledge",
         )
         assert route == "knowledge"
 
     async def test_scenario_whatsapp_payment_link(self):
         route = await self._route(
-            "Can I sell through WhatsApp using the Payment Link?",
-            "knowledge", "knowledge"
+            "Can I sell through WhatsApp using the Payment Link?", "knowledge", "knowledge"
         )
         assert route == "knowledge"
 
@@ -155,7 +163,9 @@ class TestKnowledgeAgent:
         messages = [AIMessage(content=answer)]
         if sources:
             # simulate a tool message with [Source: url] lines so _extract_sources works
-            tool_msg = ToolMessage(content="\n".join(f"[Source: {s}]" for s in sources), tool_call_id="t1")
+            tool_msg = ToolMessage(
+                content="\n".join(f"[Source: {s}]" for s in sources), tool_call_id="t1"
+            )
             messages = [tool_msg] + messages
         mock_graph.ainvoke.return_value = {"messages": messages}
         return mock_graph
@@ -164,8 +174,10 @@ class TestKnowledgeAgent:
         llm = AsyncMock(spec=LLMPort)
         retrieval = AsyncMock(spec=RagRetrievalService)
         search = AsyncMock(spec=SearchPort)
-        cache = AsyncMock(spec=CachePort, **{"get.return_value": None}) # type: ignore
-        return KnowledgeAgent(llm=llm, retrieval=retrieval, search=search, cache=cache, _graph=graph)
+        cache = AsyncMock(spec=CachePort, **{"get.return_value": None})  # type: ignore
+        return KnowledgeAgent(
+            llm=llm, retrieval=retrieval, search=search, cache=cache, _graph=graph
+        )
 
     async def test_run_returns_answer_from_graph(self):
         graph = self._make_mock_graph(answer="Getnet accepts Visa.", sources=["getnet.com.br"])
@@ -260,8 +272,10 @@ class TestCustomerSupportAgent:
     async def test_get_profile_tool_returns_formatted_profile(self):
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_profile.return_value = UserProfile(
-            plan="Get Smart", machine_model="Smart 2",
-            status="active", joined_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            plan="Get Smart",
+            machine_model="Smart 2",
+            status="active",
+            joined_at=datetime(2020, 1, 1, tzinfo=UTC),
         )
         tool = _make_get_profile_tool(user_repo)
         result = await tool.ainvoke({"user_id": "u1"})
@@ -282,9 +296,11 @@ class TestCustomerSupportAgent:
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_transactions.return_value = [
             Transaction(
-                id="TX-001", amount=15000, status="settled",
-                created_at=datetime(2026, 8, 7, tzinfo=timezone.utc),
-                settlement_date=datetime(2026, 8, 8, tzinfo=timezone.utc),
+                id="TX-001",
+                amount=15000,
+                status="settled",
+                created_at=datetime(2026, 8, 7, tzinfo=UTC),
+                settlement_date=datetime(2026, 8, 8, tzinfo=UTC),
             )
         ]
         tool = _make_get_transactions_tool(user_repo)
@@ -304,9 +320,11 @@ class TestCustomerSupportAgent:
 
     async def test_get_settlement_tool_returns_date(self):
         tx = Transaction(
-            id="TX-001", amount=50000, status="settled",
-            created_at=datetime(2026, 8, 6, tzinfo=timezone.utc),
-            settlement_date=datetime(2026, 8, 7, tzinfo=timezone.utc),
+            id="TX-001",
+            amount=50000,
+            status="settled",
+            created_at=datetime(2026, 8, 6, tzinfo=UTC),
+            settlement_date=datetime(2026, 8, 7, tzinfo=UTC),
         )
         user_repo = AsyncMock(spec=UserRepositoryPort)
         user_repo.get_transactions.return_value = [tx]

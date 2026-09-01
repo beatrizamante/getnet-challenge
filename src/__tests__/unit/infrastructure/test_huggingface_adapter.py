@@ -1,7 +1,8 @@
 # pylint: disable=redefined-outer-name,protected-access
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
-from unittest.mock import MagicMock, patch
 
 from src.infrastructure.adapters.embeddings.huggingface_adapter import HuggingFaceEmbeddingAdapter
 from src.infrastructure.config.settings import EmbeddingSettings

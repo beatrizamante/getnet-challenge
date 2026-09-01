@@ -74,7 +74,9 @@ async def test_log_escalation_trims_and_expires_redis_list(agent, redis_client):
 
 
 async def test_get_audit_log_decodes_redis_entries(agent, redis_client):
-    stored = json.dumps({"user_id": "u1", "message": "help", "reason": "", "timestamp": "2026-08-08T00:00:00+00:00"})
+    stored = json.dumps(
+        {"user_id": "u1", "message": "help", "reason": "", "timestamp": "2026-08-08T00:00:00+00:00"}
+    )
     redis_client.lrange.return_value = [stored.encode()]
 
     log = await agent.get_audit_log("u1")

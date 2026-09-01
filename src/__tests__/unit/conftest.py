@@ -1,9 +1,10 @@
 # pylint: disable=redefined-outer-name
+from unittest.mock import AsyncMock
+
 import chromadb
 import fakeredis.aioredis
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock
 
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.Embedding_Port import EmbeddingPort
@@ -23,7 +24,9 @@ class _AsyncCollectionWrapper:
         self._col.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
 
     async def query(self, *, query_embeddings, n_results, include):
-        return self._col.query(query_embeddings=query_embeddings, n_results=n_results, include=include)
+        return self._col.query(
+            query_embeddings=query_embeddings, n_results=n_results, include=include
+        )
 
     async def count(self) -> int:
         return self._col.count()
@@ -82,8 +85,8 @@ def collection_name() -> str:
 #   "unrelated query" has cosine sim = 0.0 with "original query"
 _SEMANTIC_EMBEDDINGS: dict[str, list[float]] = {
     "original query": [1.0, 0.0, 0.0, 0.0],
-    "similar query":  [0.95, 0.31, 0.0, 0.0],   # cos_sim ≈ 0.95 → HIT
-    "unrelated query": [0.0, 0.0, 1.0, 0.0],    # cos_sim = 0.0  → MISS
+    "similar query": [0.95, 0.31, 0.0, 0.0],  # cos_sim ≈ 0.95 → HIT
+    "unrelated query": [0.0, 0.0, 1.0, 0.0],  # cos_sim = 0.0  → MISS
 }
 
 

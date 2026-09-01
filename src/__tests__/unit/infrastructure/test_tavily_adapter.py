@@ -1,6 +1,7 @@
 # pylint: disable=redefined-outer-name
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.domain.entities.Search_Result import SearchResult
 from src.infrastructure.adapters.search.tavily_adapter import TavilySearchAdapter
@@ -10,8 +11,18 @@ _SETTINGS = SearchSettings(api_key="test-key", max_results=3)
 
 _TAVILY_RESPONSE = {
     "results": [
-        {"title": "Getnet Máquinas", "url": "https://getnet.net/maquinas", "content": "Conheça as maquininhas.", "score": 0.9},
-        {"title": "Pix Getnet", "url": "https://getnet.net/pix", "content": "Aceite Pix.", "score": 0.8},
+        {
+            "title": "Getnet Máquinas",
+            "url": "https://getnet.net/maquinas",
+            "content": "Conheça as maquininhas.",
+            "score": 0.9,
+        },
+        {
+            "title": "Pix Getnet",
+            "url": "https://getnet.net/pix",
+            "content": "Aceite Pix.",
+            "score": 0.8,
+        },
     ]
 }
 

@@ -1,5 +1,5 @@
 # pylint: disable=redefined-outer-name,protected-access
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,7 +14,9 @@ _SETTINGS = RedisSettings(host="localhost", port=6379, db=0)
 async def adapter_with_mock_pool():
     mock_pool = AsyncMock()
     mock_pool.enqueue_job = AsyncMock(return_value=MagicMock())
-    with patch("src.infrastructure.adapters.queue.arq_adapter.arq.create_pool", return_value=mock_pool):
+    with patch(
+        "src.infrastructure.adapters.queue.arq_adapter.arq.create_pool", return_value=mock_pool
+    ):
         inst = ArqQueueAdapter(_SETTINGS)
         # Trigger lazy pool creation
         await inst._get_pool()
@@ -29,11 +31,9 @@ async def test_enqueue_calls_enqueue_job_with_job_name(adapter_with_mock_pool):
 
 async def test_enqueue_at_passes_defer_until(adapter_with_mock_pool):
     adapter, mock_pool = adapter_with_mock_pool
-    run_at = datetime(2026, 8, 10, 2, 0, 0, tzinfo=timezone.utc)
+    run_at = datetime(2026, 8, 10, 2, 0, 0, tzinfo=UTC)
     await adapter.enqueue_at("run_eval_suite", run_at)
-    mock_pool.enqueue_job.assert_awaited_once_with(
-        "run_eval_suite", _defer_until=run_at
-    )
+    mock_pool.enqueue_job.assert_awaited_once_with("run_eval_suite", _defer_until=run_at)
 
 
 async def test_enqueue_passes_kwargs_to_job(adapter_with_mock_pool):
@@ -59,7 +59,7 @@ async def test_enqueue_at_degrades_gracefully_on_redis_failure():
         side_effect=ConnectionError("Redis down"),
     ):
         adapter = ArqQueueAdapter(_SETTINGS)
-        run_at = datetime(2026, 8, 10, 2, 0, 0, tzinfo=timezone.utc)
+        run_at = datetime(2026, 8, 10, 2, 0, 0, tzinfo=UTC)
         await adapter.enqueue_at("run_eval_suite", run_at)  # must not raise
 
 

@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 from redis.exceptions import RedisError
 
 from src.infrastructure.adapters.cache.redis_cache_adapter import RedisCacheAdapter
@@ -61,7 +62,9 @@ async def test_set_applies_ttl(adapter, redis_client):
     assert ttl > 0
 
 
-async def test_get_degrades_gracefully_when_redis_is_down(redis_client, mock_semantic_embedding_port):
+async def test_get_degrades_gracefully_when_redis_is_down(
+    redis_client, mock_semantic_embedding_port
+):
     adapter = RedisCacheAdapter(
         client=redis_client,
         embedding_port=mock_semantic_embedding_port,
@@ -72,7 +75,9 @@ async def test_get_degrades_gracefully_when_redis_is_down(redis_client, mock_sem
     assert result is None
 
 
-async def test_set_degrades_gracefully_when_redis_is_down(redis_client, mock_semantic_embedding_port):
+async def test_set_degrades_gracefully_when_redis_is_down(
+    redis_client, mock_semantic_embedding_port
+):
     adapter = RedisCacheAdapter(
         client=redis_client,
         embedding_port=mock_semantic_embedding_port,

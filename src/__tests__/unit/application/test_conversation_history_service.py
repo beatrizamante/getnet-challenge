@@ -33,10 +33,12 @@ async def test_append_persists_turn_with_configured_ttl() -> None:
 
     mock_cache.set.assert_awaited_once_with(
         "session:session-1",
-        json.dumps([
-            {"role": "user", "content": "Oi"},
-            {"role": "assistant", "content": "Como posso ajudar?"},
-        ]),
+        json.dumps(
+            [
+                {"role": "user", "content": "Oi"},
+                {"role": "assistant", "content": "Como posso ajudar?"},
+            ]
+        ),
         120,
     )
 
@@ -44,12 +46,14 @@ async def test_append_persists_turn_with_configured_ttl() -> None:
 @pytest.mark.asyncio
 async def test_append_keeps_only_the_configured_number_of_conversation_turns() -> None:
     mock_cache = _make_cache()
-    mock_cache.get.return_value = json.dumps([
-        {"role": "user", "content": "one"},
-        {"role": "assistant", "content": "two"},
-        {"role": "user", "content": "three"},
-        {"role": "assistant", "content": "four"},
-    ])
+    mock_cache.get.return_value = json.dumps(
+        [
+            {"role": "user", "content": "one"},
+            {"role": "assistant", "content": "two"},
+            {"role": "user", "content": "three"},
+            {"role": "assistant", "content": "four"},
+        ]
+    )
     service = ConversationHistoryService(mock_cache, max_turns=2)
 
     await service.append("session-1", "user", "five")

@@ -1,11 +1,11 @@
 # pylint: disable=redefined-outer-name,protected-access
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
 from pydantic import BaseModel
 
-from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter
-from src.infrastructure.adapters.llm.llm_adapter import _with_retry
+from src.infrastructure.adapters.llm.llm_adapter import LLMAdapter, _with_retry
 
 
 class _Answer(BaseModel):
@@ -34,6 +34,8 @@ def adapter(mock_langfuse, mock_chat_model):
     instance = LLMAdapter.__new__(LLMAdapter)
     instance._model = mock_chat_model
     instance._langfuse = mock_langfuse
+    instance._max_retries = 3
+    instance._base_delay = 1.0
     return instance
 
 

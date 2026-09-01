@@ -14,36 +14,14 @@ from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.ports.Cache_Port import CachePort
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.Search_Port import SearchPort
-from src.domain.shared.Agent_State import AgentState
+from src.domain.shared.Agent_State import AgentState, Turn
 from src.domain.shared.constants import CONTEXT_CHUNK_SEPARATOR, REACT_MAX_ITERATIONS
+from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
 
 _retrieved_ctx: ContextVar[list[str]] = ContextVar("retrieved_context")
-
-_SYSTEM_PROMPT = """\
-You are a Getnet product specialist.
-
-## Tools
-- retrieve_from_kb: search Getnet's internal knowledge base for product/service info.
-- web_search: search the web — only for questions the knowledge base cannot answer.
-
-## Policy
-1. Always call retrieve_from_kb first.
-2. Only call web_search if retrieve_from_kb returns nothing useful, or the question \
-is explicitly not about Getnet's own products/services.
-3. Never answer a Getnet-specific question from web_search alone without first \
-trying retrieve_from_kb.
-
-## Citations
-Every factual claim must carry a [Source: ...] label pointing to the tool result \
-it came from. If neither tool surfaces an answer, say so plainly — never invent \
-facts about Getnet products, fees, or policies.
-"""
-
-_KB_CACHE_TTL = 1800  # 30 min
-
 
 class KnowledgeAgent:
     """LangGraph ReAct agent — graph compiled once; per-request context via ContextVar."""
@@ -55,18 +33,29 @@ class KnowledgeAgent:
         search: SearchPort,
         cache: CachePort,
         langfuse: LangfuseAdapter | None = None,
+        kb_cache_ttl: int = 1800,
+        prompts: PromptCatalog | None = None,
         _graph: Any = None,
     ) -> None:
         self._langfuse = langfuse
+        prompt_catalog = prompts or load_prompt_catalog()
         tools = [
-            _make_retrieve_tool(retrieval, cache),
+            _make_retrieve_tool(retrieval, cache, kb_cache_ttl),
             _make_web_search_tool(search),
         ]
         self._graph = _graph or create_agent(
             llm.as_runnable(),
             tools=tools,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=prompt_catalog.knowledge_system,
         )
+
+    def _build_messages(self, history: list[Turn], current: str) -> list:
+        msgs = []
+        for turn in history:
+            cls = HumanMessage if turn["role"] == "user" else AIMessage
+            msgs.append(cls(content=turn["content"]))
+        msgs.append(HumanMessage(content=current))
+        return msgs
 
     async def run(self, state: AgentState) -> dict:
         user_message = state["messages"][-1] if state.get("messages") else ""
@@ -108,7 +97,11 @@ class KnowledgeAgent:
         }
 
 
-def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
+def _make_retrieve_tool(
+    retrieval: RagRetrievalService,
+    cache: CachePort,
+    kb_cache_ttl: int = 1800,
+):
     @lc_tool
     async def retrieve_from_kb(query: str) -> str:
         """Search Getnet's knowledge base for product and service information."""
@@ -130,7 +123,7 @@ def _make_retrieve_tool(retrieval: RagRetrievalService, cache: CachePort):
 
         context = CONTEXT_CHUNK_SEPARATOR.join(f"[Source: {c.source}]\n{c.content}" for c in chunks)
         sources = list(dict.fromkeys(c.source for c in chunks))
-        await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), _KB_CACHE_TTL)
+        await cache.set(cache_key, json.dumps({"context": context, "sources": sources}), kb_cache_ttl)
         _retrieved_ctx.get().append(context)
         return context
 

@@ -10,32 +10,12 @@ from src.domain.entities.Agent_Response import AgentResponseModel
 from src.domain.ports.LLM_Port import LLMPort
 from src.domain.ports.User_Repository_Port import UserRepositoryPort
 from src.domain.shared.Application_Errors import UserNotFoundError
-from src.domain.shared.Agent_State import AgentState
+from src.domain.shared.Agent_State import AgentState, Turn
 from src.domain.shared.constants import REACT_MAX_ITERATIONS
+from src.infrastructure.config.prompt_catalog import PromptCatalog, load_prompt_catalog
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 
 logger = logging.getLogger(__name__)
-
-_SYSTEM_PROMPT = """\
-You are a Getnet customer support specialist assisting user {user_id}.
-
-## Grounding rule
-Never answer from assumption. Every fact about this user's account, transactions, \
-or settlements must come from a tool call — not from inference.
-
-## Tool policy
-- Call get_user_profile(user_id='{user_id}') before your first response in this \
-conversation, even if the question seems answerable without it.
-- For any question about past transactions or settlement status in general, call \
-get_transaction_history.
-- For a specific transaction's settlement date, call get_settlement_estimate.
-- If a question needs more than one tool, resolve dependencies in order (e.g. \
-transaction history before a settlement estimate that needs a transaction ID).
-
-## Style
-Be empathetic, clear, and concise. Reason about which tool(s) the question needs \
-before answering, but show the user only the final answer.
-"""
 
 class CustomerSupportAgent:
     """ReAct agent with 3 tools: profile lookup, transaction history, settlement estimate."""
@@ -45,9 +25,11 @@ class CustomerSupportAgent:
         llm: LLMPort,
         user_repo: UserRepositoryPort,
         langfuse: LangfuseAdapter | None = None,
+        prompts: PromptCatalog | None = None,
         _graph: Any = None,
     ) -> None:
         self._langfuse = langfuse
+        self._prompts = prompts or load_prompt_catalog()
         tools = [
             _make_get_profile_tool(user_repo),
             _make_get_transactions_tool(user_repo),
@@ -55,13 +37,21 @@ class CustomerSupportAgent:
         ]
         self._graph = _graph or create_agent(llm.as_runnable(), tools=tools)
 
+    def _build_messages(self, history: list[Turn], current: str) -> list:
+        msgs = []
+        for turn in history:
+            cls = HumanMessage if turn["role"] == "user" else AIMessage
+            msgs.append(cls(content=turn["content"]))
+        msgs.append(HumanMessage(content=current))
+        return msgs
+
     async def run(self, state: AgentState) -> dict:
         user_id = state["user_id"]
         user_message = state["messages"][-1] if state.get("messages") else ""
         session_id = str(state.get("session_id", ""))
 
         messages = [
-            SystemMessage(content=_SYSTEM_PROMPT.format(user_id=user_id)),
+            SystemMessage(content=self._prompts.customer_support_system.format(user_id=user_id)),
             HumanMessage(content=user_message),
         ]
 

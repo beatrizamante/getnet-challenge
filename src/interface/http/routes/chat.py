@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 
 from src._lib.container import Container, get_container
 from src.application.agents.escalation_agent import EscalationAgent
+from src.application.caching.conversation_history_service import ConversationHistoryService
 from src.application.caching.semantic_cache_service import SemanticCacheService
 from src.application.guardrails.input_guardrail import InputGuardrail
 from src.application.guardrails.output_guardrail import OutputGuardrail
@@ -35,6 +36,9 @@ def _output_guard(container: Annotated[Container, Depends(get_container)]) -> Ou
 def _cache(container: Annotated[Container, Depends(get_container)]) -> SemanticCacheService:
     return container.semantic_cache_service()
 
+def _history_service(container: Annotated[Container, Depends(get_container)]) -> ConversationHistoryService:
+    return container.history_service()
+
 
 @router.post("/chat", response_model=AgentResponseModel)
 async def chat(
@@ -45,6 +49,7 @@ async def chat(
     input_guard: InputGuardrail = Depends(_input_guard),
     output_guard: OutputGuardrail = Depends(_output_guard),
     cache: SemanticCacheService = Depends(_cache),
+    history_service: ConversationHistoryService = Depends(_history_service)
 ) -> AgentResponseModel:
     """Run the agent orchestration graph and return a structured response."""
     guard_result = await input_guard.check(body.message)
@@ -58,14 +63,20 @@ async def chat(
     if cached_json:
         return AgentResponseModel.model_validate_json(cached_json)
 
+    history = await history_service.get(body.session_id or "")
+
     state: AgentState = {
         "messages": [body.message],
+        "history": history,
         "user_id": body.user_id,
         "session_id": body.session_id or str(uuid.uuid4()),
     }
     result = await graph.ainvoke(state)
     raw: dict = result.get("response") or {}
     answer = str(raw.get("answer") or "")
+
+    await history_service.append(state["session_id"], "user", body.message)
+    await history_service.append(state["session_id"], "assistant", answer)
     source_agent = str(raw.get("source_agent") or "unknown")
     context: str = result.get("context") or ""
 

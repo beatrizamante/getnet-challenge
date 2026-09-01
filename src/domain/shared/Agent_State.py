@@ -1,8 +1,12 @@
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
+class Turn(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str
 
 class AgentState(TypedDict):
     messages: list[str]
+    history: NotRequired[list[Turn]]
     user_id: str
     route: NotRequired[str | None]
     context: NotRequired[str]

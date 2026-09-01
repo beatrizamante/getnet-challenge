@@ -12,15 +12,6 @@ from src.domain.shared.Agent_State import AgentState
 from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseAdapter
 from src.infrastructure.adapters.observability.tracing import traced_node
 
-_OFF_TOPIC_ANSWER = (
-    "I'm only able to assist with questions related to Getnet's payment solutions and services. "
-    "For other topics, please use a general-purpose search engine."
-)
-
-
-async def _off_topic_node(_: AgentState) -> dict:
-    return {"response": {"answer": _OFF_TOPIC_ANSWER, "source_agent": "off_topic", "sources": []}}
-
 
 async def _formatter_node(state: AgentState) -> dict:
     """Validates and normalises the agent response through AgentResponseModel before the graph exits."""
@@ -59,9 +50,12 @@ def build_graph(
     customer_support: CustomerSupportAgent,
     escalation: EscalationAgent,
     langfuse: LangfuseAdapter | None = None,
+    off_topic_answer: str = "I'm only able to assist with questions related to Getnet's payment solutions and services. For other topics, please use a general-purpose search engine.",
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(AgentState)
 
+    async def _off_topic_node(_: AgentState) -> dict:
+        return {"response": {"answer": off_topic_answer, "source_agent": "off_topic", "sources": []}}
     #NOTE - While we are adding a string object with a 'conversation memory' between agents here, it was done for simplicity sake, but there are better and more economic methods of doing it so.
     #NOTE - A summarizer is one of them. A small model running on the local server just to summarize the conversation.
     #NOTE - Another way is by summarizing the nth State into one paragraph (trim), while keeping the rest

@@ -10,26 +10,28 @@ from src.infrastructure.adapters.observability.langfuse_adapter import LangfuseA
 
 logger = logging.getLogger(__name__)
 
-_HANDOFF_ANSWER = (
-    "I'm transferring you to a human specialist who can better assist with your request. "
-    "Please hold — someone from the Getnet support team will be with you shortly."
-)
-
 _ESCALATION_KEY = "escalations:{user_id}"
-_ESCALATION_TTL = 86400 * 30  # keep audit trail for 30 days
-_MAX_ENTRIES = 100             # cap list length per user
-
 
 class EscalationAgent:
     """Returns an immediate handoff response; async logging runs separately as a BackgroundTask."""
 
-    def __init__(self, langfuse: LangfuseAdapter, redis_client: aioredis.Redis) -> None:
+    def __init__(
+        self,
+        langfuse: LangfuseAdapter,
+        redis_client: aioredis.Redis,
+        handoff_answer: str = "I'm transferring you to a human specialist who can better assist with your request. Please hold — someone from the Getnet support team will be with you shortly.",
+        audit_ttl: int = 86400 * 30,
+        max_entries: int = 100,
+    ) -> None:
         self._langfuse = langfuse
         self._redis = redis_client
+        self._handoff_answer = handoff_answer
+        self._audit_ttl = audit_ttl
+        self._max_entries = max_entries
 
     async def run(self, _: AgentState) -> dict:
         return {"response": AgentResponseModel.build(
-            answer=_HANDOFF_ANSWER,
+            answer=self._handoff_answer,
             source_agent="escalate",
         ).model_dump()}
 
@@ -46,9 +48,9 @@ class EscalationAgent:
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
         })
         key = _ESCALATION_KEY.format(user_id=user_id)
-        await self._redis.lpush(key, event)         # type: ignore[misc]
-        await self._redis.ltrim(key, 0, _MAX_ENTRIES - 1)
-        await self._redis.expire(key, _ESCALATION_TTL)
+        await self._redis.lpush(key, event)
+        await self._redis.ltrim(key, 0, self._max_entries - 1)
+        await self._redis.expire(key, self._audit_ttl)
         logger.info("Escalation logged. user_id=%s reason=%s", user_id, reason)
 
     async def get_audit_log(self, user_id: str) -> list[dict]:

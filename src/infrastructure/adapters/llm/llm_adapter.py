@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-_MAX_RETRIES = 3
-_BASE_DELAY = 1.0
 # Retry on server errors and rate limits; client errors (4xx except 429) are not retried.
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
@@ -34,6 +32,8 @@ class LLMAdapter(LLMPort):
             max_retries=0,  # retries handled by _with_retry below
         )
         self._langfuse = langfuse
+        self._max_retries = settings.max_retries
+        self._base_delay = settings.base_delay
 
     def as_runnable(self) -> ChatOpenAI:
         """Expose the raw model so LangGraph agents can call bind_tools() on it."""
@@ -43,7 +43,7 @@ class LLMAdapter(LLMPort):
         """Run a free-text completion and trace the call in Langfuse."""
         trace_id = self._langfuse.trace("llm.complete", {"prompt": prompt, "system": system})
         messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
-        response = await _with_retry(self._model.ainvoke, messages)
+        response = await _with_retry(self._model.ainvoke, messages, max_retries=self._max_retries, base_delay=self._base_delay)
         output = str(response.content)
         self._langfuse.span(trace_id, "llm.complete", input_data={"prompt": prompt}, output={"output": output})
         return output
@@ -64,17 +64,17 @@ class LLMAdapter(LLMPort):
 _R = TypeVar("_R")
 
 
-async def _with_retry(fn: Callable[..., Awaitable[_R]], *args: Any, **kwargs: Any) -> _R:
+async def _with_retry(fn: Callable[..., Awaitable[_R]], *args: Any, max_retries: int = 3, base_delay: float = 1.0, **kwargs: Any) -> _R:
     """Exponential backoff for transient HTTP errors (rate limits, 5xx)."""
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(max_retries):
         try:
             return await fn(*args, **kwargs)
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code not in _RETRYABLE_STATUS or attempt == _MAX_RETRIES - 1:
+            if exc.response.status_code not in _RETRYABLE_STATUS or attempt == max_retries - 1:
                 raise
-            await asyncio.sleep(_BASE_DELAY * (2**attempt))
+            await asyncio.sleep(base_delay * (2**attempt))
         except httpx.ConnectError:
-            if attempt == _MAX_RETRIES - 1:
+            if attempt == max_retries - 1:
                 raise
-            await asyncio.sleep(_BASE_DELAY * (2**attempt))
+            await asyncio.sleep(base_delay * (2**attempt))
     raise RuntimeError("_with_retry loop exhausted without returning")  # unreachable

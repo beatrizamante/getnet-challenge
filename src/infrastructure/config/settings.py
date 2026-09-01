@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,6 +46,15 @@ class LangfuseSettings(BaseSettings):
     host: str = Field(default="https://cloud.langfuse.com")
     enabled: bool = Field(default=False)
 
+    @model_validator(mode="after")
+    def _credentials_required_when_enabled(self) -> "LangfuseSettings":
+        if self.enabled and (not self.public_key or not self.secret_key):
+            raise ValueError(
+                "LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are required "
+                "when LANGFUSE_ENABLED=true"
+            )
+        return self
+
 
 class EmbeddingSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HF_", env_file=".env", extra="ignore")
@@ -67,6 +76,15 @@ class IngestionSettings(BaseSettings):
     chunk_overlap: int = Field(default=64, ge=0)
     request_delay: float = Field(default=1.5, ge=0)
     max_concurrent: int = Field(default=3, gt=0)
+
+    @model_validator(mode="after")
+    def _overlap_lt_chunk_size(self) -> "IngestionSettings":
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                f"INGEST_CHUNK_OVERLAP ({self.chunk_overlap}) must be "
+                f"less than INGEST_CHUNK_SIZE ({self.chunk_size})"
+            )
+        return self
 
 
 class GuardrailSettings(BaseSettings):
@@ -158,6 +176,23 @@ class Settings(BaseSettings):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     escalation: EscalationSettings = Field(default_factory=EscalationSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
+
+
+    @model_validator(mode="after")
+    def _production_requirements(self) -> "Settings":  # pylint: disable=no-member
+        # pylint: disable=no-member
+        if self.app.env != "production":
+            return self
+        errors: list[str] = []
+        if not self.llm.api_key:
+            errors.append("LLM_API_KEY is required in production")
+        if not self.search.api_key:
+            errors.append("SEARCH_API_KEY is required in production")
+        if not self.redis.password:
+            errors.append("REDIS_PASSWORD is required in production")
+        if errors:
+            raise ValueError("\n".join(errors))
+        return self
 
 
 @lru_cache(maxsize=1)
